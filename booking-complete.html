@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>予約ページ | 適職診断</title>
+    <style>
+      :root {
+        color-scheme: light;
+      }
+
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background: #f4f6ff;
+        color: #1f2b4d;
+      }
+
+      main {
+        width: min(660px, 92vw);
+        margin: 52px auto;
+        background: #fff;
+        border: 1px solid #dbe2fa;
+        border-radius: 14px;
+        padding: 24px;
+      }
+
+      h1 {
+        margin: 0 0 10px;
+      }
+
+      p {
+        margin: 0 0 12px;
+        color: #4d5880;
+      }
+
+      .calendar-label {
+        margin: 0 0 10px;
+        padding: 8px 10px;
+        border-radius: 8px;
+        background: #edf1ff;
+        color: #2f3b69;
+        font-weight: 600;
+      }
+
+      .actions {
+        margin-top: 18px;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      button,
+      a {
+        font: inherit;
+        border: 0;
+        border-radius: 10px;
+        padding: 12px 14px;
+        text-decoration: none;
+        cursor: pointer;
+      }
+
+      .primary {
+        background: #2852ff;
+        color: #fff;
+      }
+
+      .secondary {
+        background: #edf1ff;
+        color: #2f3b69;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>予約タブを開きました</h1>
+      <p class="calendar-label" id="calendar-label">対象カレンダー: -</p>
+      <p>
+        下の「カレンダーを開いて予約する」から実際の予約画面へ進んでください。予約が完了したら「予約完了して診断画面に戻る」で通常画面に戻れます。
+      </p>
+      <p id="status">予約完了後に戻りボタンを押してください。</p>
+      <div class="actions">
+        <a id="calendar-link" class="primary" target="_blank" rel="noopener noreferrer" href="#">カレンダーを開いて予約する</a>
+        <button id="complete-button" class="secondary" type="button">予約完了して診断画面に戻る</button>
+        <a id="return-link" class="secondary" href="/">診断画面に戻る</a>
+      </div>
+    </main>
+
+    <script>
+      (function () {
+        const BOOKING_KEY = "aptitude-booking-state-v1";
+        const params = new URLSearchParams(window.location.search);
+        const calendarId = params.get("calendarId");
+        const calendarTitle = params.get("calendarTitle") || "不明";
+        const calendarUrl = params.get("calendarUrl") || "";
+        const returnUrl = params.get("returnUrl") || "/";
+
+        const status = document.getElementById("status");
+        const calendarLabel = document.getElementById("calendar-label");
+        const calendarLink = document.getElementById("calendar-link");
+        const completeButton = document.getElementById("complete-button");
+        const returnLink = document.getElementById("return-link");
+
+        const returnTarget = new URL(returnUrl, window.location.href);
+        if (calendarId) {
+          returnTarget.searchParams.set("bookedCalendarId", calendarId);
+        }
+
+        calendarLabel.textContent = "対象カレンダー: " + calendarTitle;
+        returnLink.href = returnTarget.toString();
+
+        if (calendarUrl) {
+          calendarLink.href = calendarUrl;
+        } else {
+          calendarLink.href = "#";
+          calendarLink.textContent = "カレンダーURL未設定";
+          calendarLink.setAttribute("aria-disabled", "true");
+        }
+
+        completeButton.addEventListener("click", function () {
+          if (!calendarId) {
+            status.textContent = "予約IDが取得できないため、手動で診断画面へ戻ってください。";
+            return;
+          }
+
+          try {
+            const currentRaw = localStorage.getItem(BOOKING_KEY);
+            const current = currentRaw ? JSON.parse(currentRaw) : {};
+            current[calendarId] = {
+              booked: true,
+              bookedAt: new Date().toISOString(),
+            };
+            localStorage.setItem(BOOKING_KEY, JSON.stringify(current));
+            status.textContent = "予約完了を反映しました。診断画面へ戻ります。";
+            window.location.href = returnTarget.toString();
+          } catch (error) {
+            status.textContent = "予約反映に失敗しました。手動で診断画面へ戻ってください。";
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>
