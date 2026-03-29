@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>適職診断 x 予約カレンダー</title>
+    <meta
+      name="description"
+      content="Meta広告から流入後すぐ入力できる適職診断。結果に応じた3つの予約カレンダーへ進めます。"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <header class="hero">
+        <p class="badge">Meta広告導線対応</p>
+        <h1>30秒でわかる適職診断</h1>
+        <p class="subtext">
+          入力内容をもとに、あなた向けの相談カレンダーを3つ表示します。
+        </p>
+      </header>
+
+      <section class="card">
+        <form id="diagnosis-form" class="form" novalidate>
+          <div class="row">
+            <label for="name">お名前</label>
+            <input id="name" name="name" type="text" autocomplete="name" required />
+          </div>
+
+          <div class="row">
+            <label for="email">メールアドレス</label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              autocomplete="email"
+              placeholder="name@example.com"
+              required
+            />
+          </div>
+
+          <div class="row">
+            <label for="ageGroup">年代</label>
+            <select id="ageGroup" name="ageGroup" required>
+              <option value="">選択してください</option>
+              <option value="teens">10代</option>
+              <option value="twenties">20代</option>
+              <option value="thirties">30代</option>
+              <option value="fortiesPlus">40代以上</option>
+            </select>
+          </div>
+
+          <div class="row">
+            <label for="interest">興味がある働き方</label>
+            <select id="interest" name="interest" required>
+              <option value="">選択してください</option>
+              <option value="creative">クリエイティブ</option>
+              <option value="analysis">分析・企画</option>
+              <option value="sales">営業・対人支援</option>
+              <option value="tech">IT・エンジニア</option>
+            </select>
+          </div>
+
+          <div class="row">
+            <label for="priority">いま重視したいこと</label>
+            <select id="priority" name="priority" required>
+              <option value="">選択してください</option>
+              <option value="income">年収アップ</option>
+              <option value="stability">安定性</option>
+              <option value="challenge">成長機会</option>
+              <option value="balance">ワークライフバランス</option>
+            </select>
+          </div>
+
+          <input type="hidden" id="adSource" name="adSource" />
+          <input type="hidden" id="campaignId" name="campaignId" />
+
+          <button type="submit" class="primary-button">3つのカレンダーを表示</button>
+          <p class="hint">※入力は1分以内で完了できます。</p>
+        </form>
+      </section>
+
+      <section id="result-section" class="result hidden" aria-live="polite">
+        <div class="result-header">
+          <h2>あなた向けの予約カレンダー（3件）</h2>
+          <p>
+            別タブで予約後、自動でこの画面に戻れるようにしています。戻らない場合は「予約完了を反映」を押してください。
+          </p>
+        </div>
+
+        <div id="booking-status" class="booking-status hidden"></div>
+        <div id="calendar-list" class="calendar-list"></div>
+      </section>
+    </main>
+
+    <template id="calendar-card-template">
+      <article class="calendar-card">
+        <h3 class="calendar-title"></h3>
+        <p class="calendar-description"></p>
+        <ul class="calendar-meta"></ul>
+        <div class="calendar-actions">
+          <a class="reserve-button" target="_blank" rel="noopener noreferrer">この枠を予約する</a>
+          <button type="button" class="secondary-button mark-booked-button">予約完了を反映</button>
+        </div>
+      </article>
+    </template>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
