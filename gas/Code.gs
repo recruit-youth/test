@@ -430,6 +430,7 @@ function handleReserveSlot_(payload) {
 
   try {
     var sheet = getOrCreateSheet_(RESERVATIONS_SHEET_NAME);
+    migrateReservationsHeadersToJapanese_(sheet);
     var hash = buildReservationHash_(agentName, date, time);
     var latest = getLatestReservationByHash_(sheet, hash);
     var now = new Date();
@@ -454,7 +455,7 @@ function handleReserveSlot_(payload) {
             hold_token: latestHoldToken,
             hold_expires_at_iso: renewedExpiry.toISOString(),
             updated_at_iso: now.toISOString(),
-            updated_at_jst: Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm:ss')
+            updated_at_jst: Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy/MM/dd/ HH:mm')
           });
 
           return {
@@ -481,7 +482,7 @@ function handleReserveSlot_(payload) {
       hold_token: holdToken,
       hold_expires_at_iso: holdExpiry.toISOString(),
       updated_at_iso: now.toISOString(),
-      updated_at_jst: Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm:ss')
+      updated_at_jst: Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy/MM/dd/ HH:mm')
     });
 
     return {
@@ -523,6 +524,7 @@ function handleUpdateReservationStatus_(payload) {
 
   try {
     var sheet = getOrCreateSheet_(RESERVATIONS_SHEET_NAME);
+    migrateReservationsHeadersToJapanese_(sheet);
     var latest = getLatestReservationByHash_(sheet, hash);
     if (!latest) {
       return { ok: false, error: 'reservation not found' };
@@ -538,7 +540,7 @@ function handleUpdateReservationStatus_(payload) {
       hold_token: '',
       hold_expires_at_iso: '',
       updated_at_iso: now.toISOString(),
-      updated_at_jst: Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm:ss')
+      updated_at_jst: Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy/MM/dd/ HH:mm')
     });
 
     return { ok: true, reservation_hash: hash, status: status };
@@ -549,6 +551,7 @@ function handleUpdateReservationStatus_(payload) {
 
 function finalizeReservationDetails_(details, now) {
   var sheet = getOrCreateSheet_(RESERVATIONS_SHEET_NAME);
+  migrateReservationsHeadersToJapanese_(sheet);
   var results = [];
 
   for (var i = 0; i < details.length; i += 1) {
@@ -599,9 +602,9 @@ function finalizeReservationDetails_(details, now) {
       hold_token: latestHoldToken,
       hold_expires_at_iso: latest.hold_expires_at_iso || '',
       booked_at_iso: now.toISOString(),
-      booked_at_jst: Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm:ss'),
+      booked_at_jst: Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy/MM/dd/ HH:mm'),
       updated_at_iso: now.toISOString(),
-      updated_at_jst: Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm:ss')
+      updated_at_jst: Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy/MM/dd/ HH:mm')
     });
 
     results.push({ reservation_hash: hash, status: RESERVATION_STATUS.BOOKED });
@@ -743,7 +746,9 @@ function getLatestReservationByHash_(sheet, hash) {
 }
 
 function appendReservationEvent_(sheet, obj) {
-  appendObjectRow_(sheet, obj);
+  migrateReservationsHeadersToJapanese_(sheet);
+  var localized = localizeReservationData_(obj);
+  appendObjectRowWithFirstHeader_(sheet, localized, '更新時間');
 }
 
 function isBlockingReservation_(reservation, now) {
@@ -924,6 +929,90 @@ function migrateApplicantsHeadersToJapanese_(sheet) {
     converted.unshift('完了時間');
   }
 
+  sheet.getRange(1, 1, 1, converted.length).setValues([converted]);
+}
+
+function formatJstMinute_(date) {
+  return Utilities.formatDate(date, 'Asia/Tokyo', 'yyyy/MM/dd/ HH:mm');
+}
+
+function getReservationLabelMap_() {
+  return {
+    reservation_hash: '予約ハッシュ',
+    agent_name: 'エージェント名',
+    date: '予約日',
+    time: '予約時間枠',
+    status: '予約ステータス',
+    hold_token: '仮予約トークン',
+    hold_expires_at_iso: '仮予約期限ISO',
+    booked_at_iso: '確定時間ISO',
+    booked_at_jst: '確定時間',
+    updated_at_iso: '更新時間ISO',
+    updated_at_jst: '更新時間'
+  };
+}
+
+function toReservationLabel_(key) {
+  var raw = String(key || '').trim();
+  if (!raw) return '';
+
+  var map = getReservationLabelMap_();
+  if (map[raw]) return map[raw];
+
+  var normalized = normalizeHeader_(raw);
+  if (map[normalized]) return map[normalized];
+
+  return raw;
+}
+
+function localizeReservationData_(obj) {
+  var clone = Object.assign({}, obj || {});
+  ['updated_at_jst', 'booked_at_jst'].forEach(function(k) {
+    var v = clone[k];
+    if (v) {
+      var d = new Date(v);
+      if (String(d) !== 'Invalid Date') {
+        clone[k] = formatJstMinute_(d);
+      } else {
+        clone[k] = String(v || '').slice(0, 16).replace(/-/g, '/').replace('T', '/ ');
+      }
+    }
+  });
+
+  var localized = {};
+  Object.keys(clone).forEach(function(key) {
+    localized[toReservationLabel_(key)] = clone[key];
+  });
+
+  if (!localized['更新時間']) {
+    localized['更新時間'] = formatJstMinute_(new Date());
+  }
+  return localized;
+}
+
+function migrateReservationsHeadersToJapanese_(sheet) {
+  var lastRow = sheet.getLastRow();
+  var lastCol = sheet.getLastColumn();
+  if (lastRow < 1 || lastCol < 1) return;
+
+  var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0]
+    .map(function(v) { return String(v || '').trim(); });
+
+  var seen = {};
+  var converted = [];
+  headers.forEach(function(header) {
+    var label = toReservationLabel_(header);
+    if (!label) return;
+    if (seen[label]) return;
+    seen[label] = true;
+    converted.push(label);
+  });
+
+  if (!converted.length) return;
+  if (converted[0] !== '更新時間') {
+    converted = converted.filter(function(h) { return h !== '更新時間'; });
+    converted.unshift('更新時間');
+  }
   sheet.getRange(1, 1, 1, converted.length).setValues([converted]);
 }
 
