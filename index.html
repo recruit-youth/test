@@ -8,9 +8,9 @@
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
   <style>
     :root {
-      --bg: #f5f7fb;
-      --surface: #ffffff;
-      --surface-elevated: #f6f7f9;
+      --bg: #eef0f3;
+      --surface: #f5f6f8;
+      --surface-elevated: #eceff3;
       --surface-deep: #eceff3;
       --text: #111827;
       --muted: #4b5563;
@@ -34,9 +34,9 @@
       margin: 0;
       font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "YuGothic", "Yu Gothic", sans-serif;
       background:
-        radial-gradient(1200px 560px at -10% -5%, rgba(251, 113, 133, .16) 0%, rgba(251, 113, 133, 0) 60%),
-        radial-gradient(900px 520px at 110% 0%, rgba(251, 146, 60, .14) 0%, rgba(251, 146, 60, 0) 62%),
-        linear-gradient(160deg, #fef2f2 0%, #f8fafc 48%, #fff7ed 100%);
+        radial-gradient(1200px 560px at -10% -5%, rgba(239, 68, 68, .10) 0%, rgba(239, 68, 68, 0) 60%),
+        radial-gradient(900px 520px at 110% 0%, rgba(251, 146, 60, .09) 0%, rgba(251, 146, 60, 0) 62%),
+        linear-gradient(160deg, #eceff3 0%, #f2f4f7 44%, #e8ebf0 100%);
       color: var(--text);
     }
 
@@ -53,9 +53,9 @@
       justify-content: center;
       padding: 20px;
       background:
-        radial-gradient(1000px 480px at 8% 0%, rgba(239, 68, 68, .20) 0%, rgba(239, 68, 68, 0) 64%),
-        radial-gradient(860px 420px at 94% 5%, rgba(251, 146, 60, .20) 0%, rgba(251, 146, 60, 0) 62%),
-        linear-gradient(140deg, #fff5f5 0%, #f8fafc 50%, #fff7ed 100%);
+        radial-gradient(1000px 480px at 8% 0%, rgba(239, 68, 68, .14) 0%, rgba(239, 68, 68, 0) 64%),
+        radial-gradient(860px 420px at 94% 5%, rgba(251, 146, 60, .12) 0%, rgba(251, 146, 60, 0) 62%),
+        linear-gradient(140deg, #eff2f6 0%, #f4f6f9 50%, #eaedf2 100%);
       transition: transform .55s ease, opacity .55s ease;
       overflow: hidden;
       perspective: 1200px;
@@ -85,8 +85,8 @@
     .intro-card {
       width: 100%;
       max-width: 560px;
-      background: linear-gradient(160deg, #ffffff 0%, #fff7ed 100%);
-      border: 1px solid rgba(255, 255, 255, .68);
+      background: linear-gradient(160deg, #f7f8fa 0%, #eceff3 100%);
+      border: 1px solid #dfe3ea;
       border-radius: 24px;
       padding: 34px 24px 28px;
       box-shadow: 0 26px 64px rgba(15, 23, 42, .24);
@@ -217,8 +217,8 @@
     }
 
     .card {
-      background: linear-gradient(180deg, #ffffff 0%, var(--surface-elevated) 100%);
-      border: 1px solid #e6e8ee;
+      background: linear-gradient(180deg, #f8f9fb 0%, var(--surface-elevated) 100%);
+      border: 1px solid #dde2e9;
       border-radius: var(--radius-lg);
       box-shadow: var(--shadow);
       padding: 20px 20px 16px;
@@ -276,7 +276,7 @@
       width: 100%;
       height: 4px;
       border-radius: 999px;
-      background: #e5e7eb;
+      background: #d9dde4;
       overflow: hidden;
       margin-bottom: 16px;
     }
@@ -539,8 +539,8 @@
 
     .agent-card {
       border-radius: 16px;
-      border: 1px solid #e2e5ea;
-      background: linear-gradient(180deg, #ffffff 0%, #f4f5f7 100%);
+      border: 1px solid #d9dee5;
+      background: linear-gradient(180deg, #f4f6f8 0%, #e7ebf0 100%);
       padding: 10px 10px 12px;
     }
 
@@ -659,8 +659,8 @@
       max-width: 900px;
       margin: 40px auto;
       padding: 20px;
-      background: linear-gradient(180deg, #f7f8fa 0%, #eceff3 100%);
-      border: 1px solid #dfe3ea;
+      background: linear-gradient(180deg, #eef1f5 0%, #e1e6ed 100%);
+      border: 1px solid #d3d9e2;
       border-radius: 12px;
     }
 
@@ -668,11 +668,11 @@
     .agent-calendar {
       margin-top: 10px;
       padding: 10px;
-      border: 1px solid #dbe0e7;
+      border: 1px solid #cfd6df;
       border-radius: 16px;
       max-width: 320px;
       /* ← 少し小さく */
-      background: linear-gradient(180deg, #f9fafb 0%, #edf1f5 100%);
+      background: linear-gradient(180deg, #eff2f6 0%, #e3e8ee 100%);
     }
 
     /* 日付セル */
@@ -683,8 +683,8 @@
 
     /* hover */
     .agent-calendar .fc-daygrid-day:hover .fc-daygrid-day-frame {
-      background: #f0f2f5;
-      box-shadow: inset 0 0 0 1px #d5d9e1;
+      background: #e6eaf0;
+      box-shadow: inset 0 0 0 1px #c7ced8;
     }
 
     /* クリック可能感 */
@@ -709,16 +709,16 @@
     }
 
     .agent-calendar .fc-button {
-      background: #f8fafc;
-      border: 1px solid #d9dee6;
+      background: #edf1f5;
+      border: 1px solid #cfd6df;
       border-radius: 999px;
       padding: 2px 6px;
       color: #4b5563;
     }
 
     .agent-calendar .fc-button:hover {
-      background: #eef0f3;
-      border-color: #d0d5dd;
+      background: #e2e7ee;
+      border-color: #c3cbd6;
     }
 
     .agent-calendar .fc-col-header-cell-cushion {
@@ -730,8 +730,8 @@
     .time-area {
       margin-top: 8px;
       padding: 10px 10px 4px;
-      border-top: 1px dashed #d7dbe2;
-      background: linear-gradient(180deg, #f8f9fb 0%, #f0f3f7 100%);
+      border-top: 1px dashed #c8ced7;
+      background: linear-gradient(180deg, #edf1f5 0%, #e3e8ef 100%);
       border-radius: 12px;
     }
 
@@ -807,8 +807,8 @@
     }
 
     .time-slot-btn {
-      border: 1px solid #d8dde5;
-      background: #f7f8fa;
+      border: 1px solid #c9d0da;
+      background: #eceff3;
       color: #334155;
       border-radius: 12px;
       padding: 8px 10px;
@@ -833,14 +833,14 @@
 
     .time-slot-btn.is-booked {
       color: #9ca3af;
-      border-color: #dde2e9;
-      background: #eceff3;
+      border-color: #c8ced8;
+      background: #e1e6ed;
     }
 
     .time-slot-btn:hover {
-      border-color: #c4cad3;
+      border-color: #b8c0cb;
       color: #1f2937;
-      background: #f0f2f5;
+      background: #e5e9ef;
     }
 
     .time-empty {
@@ -896,7 +896,7 @@
     }
 
     .agent-calendar .fc-daygrid-day.is-unavailable .fc-daygrid-day-frame {
-      background: #eceff3;
+      background: #e1e6ed;
       box-shadow: none;
     }
 
