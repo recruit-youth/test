@@ -8,18 +8,18 @@
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
   <style>
     :root {
-      --bg: #eef2ff;
+      --bg: #f5f7fb;
       --surface: #ffffff;
-      --text: #0f172a;
-      --muted: #475569;
-      --border: #dbe2f0;
-      --accent: #6366f1;
-      --accent-soft: #e0e7ff;
-      --accent-grad-from: #6366f1;
-      --accent-grad-to: #06b6d4;
-      --accent-strong: #4338ca;
-      --accent-ring: rgba(99, 102, 241, .35);
-      --accent-shadow: rgba(79, 70, 229, .30);
+      --text: #111827;
+      --muted: #4b5563;
+      --border: #e5e7eb;
+      --accent: #ef4444;
+      --accent-soft: #fee2e2;
+      --accent-grad-from: #ef4444;
+      --accent-grad-to: #fb923c;
+      --accent-strong: #b91c1c;
+      --accent-ring: rgba(239, 68, 68, .35);
+      --accent-shadow: rgba(239, 68, 68, .30);
       --shadow: 0 18px 40px rgba(15, 23, 42, 0.219);
       --radius-lg: 20px;
     }
@@ -31,7 +31,10 @@
     body {
       margin: 0;
       font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "YuGothic", "Yu Gothic", sans-serif;
-      background: radial-gradient(circle at top, #e0e7ff 0, #f1f5f9 58%, #e0f2fe 100%);
+      background:
+        radial-gradient(1200px 560px at -10% -5%, rgba(251, 113, 133, .16) 0%, rgba(251, 113, 133, 0) 60%),
+        radial-gradient(900px 520px at 110% 0%, rgba(251, 146, 60, .14) 0%, rgba(251, 146, 60, 0) 62%),
+        linear-gradient(160deg, #fef2f2 0%, #f8fafc 48%, #fff7ed 100%);
       color: var(--text);
     }
 
@@ -47,24 +50,51 @@
       align-items: center;
       justify-content: center;
       padding: 20px;
-      background: radial-gradient(circle at top, #e0e7ff 0, #f1f5f9 58%, #e0f2fe 100%);
+      background:
+        radial-gradient(1000px 480px at 8% 0%, rgba(239, 68, 68, .20) 0%, rgba(239, 68, 68, 0) 64%),
+        radial-gradient(860px 420px at 94% 5%, rgba(251, 146, 60, .20) 0%, rgba(251, 146, 60, 0) 62%),
+        linear-gradient(140deg, #fff5f5 0%, #f8fafc 50%, #fff7ed 100%);
       transition: transform .55s ease, opacity .55s ease;
+      overflow: hidden;
+      perspective: 1200px;
+    }
+
+    .intro-screen::before {
+      content: "";
+      position: absolute;
+      inset: -25%;
+      background:
+        conic-gradient(from 120deg at 25% 35%, rgba(239, 68, 68, .18), rgba(251, 146, 60, .14), rgba(239, 68, 68, .08), rgba(239, 68, 68, .18));
+      filter: blur(42px);
+      animation: introGlow 9s ease-in-out infinite alternate;
+      pointer-events: none;
+    }
+
+    .intro-screen>* {
+      position: relative;
+      z-index: 1;
     }
 
     .intro-screen.is-leaving {
-      transform: translateX(-100%);
-      opacity: 0;
+      animation: introSlideOut .86s cubic-bezier(.22, 1, .36, 1) forwards;
       pointer-events: none;
     }
 
     .intro-card {
       width: 100%;
       max-width: 560px;
-      background: #fff;
+      background: linear-gradient(160deg, #ffffff 0%, #fff7ed 100%);
+      border: 1px solid rgba(255, 255, 255, .68);
       border-radius: 24px;
       padding: 34px 24px 28px;
-      box-shadow: var(--shadow);
+      box-shadow: 0 26px 64px rgba(15, 23, 42, .24);
       text-align: center;
+      transform-origin: center;
+      backface-visibility: hidden;
+    }
+
+    .intro-screen.is-leaving .intro-card {
+      animation: introCardLift .58s cubic-bezier(.2, .85, .25, 1) forwards;
     }
 
     .intro-company {
@@ -108,7 +138,7 @@
 
     .intro-start-btn:hover {
       transform: translateY(-1px);
-      box-shadow: 0 18px 34px rgba(79, 70, 229, .36);
+      box-shadow: 0 18px 34px rgba(239, 68, 68, .34);
     }
 
     .page {
@@ -121,13 +151,13 @@
 
     .page.pre-enter {
       opacity: 0;
-      transform: translateX(48px);
+      transform: translate3d(88px, 0, 0) scale(.965);
+      filter: blur(10px);
+      will-change: transform, opacity, filter;
     }
 
     .page.is-entered {
-      opacity: 1;
-      transform: translateX(0);
-      transition: transform .55s ease, opacity .55s ease;
+      animation: pageReveal .94s cubic-bezier(.16, 1, .3, 1) forwards;
     }
 
     header {
@@ -163,8 +193,8 @@
     .hero-tag {
       padding: 4px 12px;
       border-radius: 999px;
-      border: 1px solid #c7d2fe;
-      background: rgba(224, 231, 255, .9);
+      border: 1px solid #fecaca;
+      background: rgba(254, 242, 242, .9);
       color: var(--accent-strong);
       font-size: 11px;
       font-weight: 600;
@@ -325,8 +355,8 @@
 
     input:focus,
     select:focus {
-      border-color: #a5b4fc;
-      box-shadow: 0 0 0 1px #a5b4fc;
+      border-color: #fecaca;
+      box-shadow: 0 0 0 1px #fecaca;
       background: #fff;
     }
 
@@ -415,7 +445,7 @@
 
     .btn-primary:hover:not(:disabled) {
       transform: translateY(-1px);
-      box-shadow: 0 14px 30px rgba(79, 70, 229, .38);
+      box-shadow: 0 14px 30px rgba(239, 68, 68, .36);
     }
 
     .error-msg {
@@ -506,7 +536,7 @@
 
     .agent-card {
       border-radius: 16px;
-      border: 1px solid #dbeafe;
+      border: 1px solid #fee2e2;
       background: #fff;
       padding: 10px 10px 12px;
     }
@@ -649,8 +679,8 @@
 
     /* hover */
     .agent-calendar .fc-daygrid-day:hover .fc-daygrid-day-frame {
-      background: #eef2ff;
-      box-shadow: inset 0 0 0 1px #a5b4fc;
+      background: #fff1f2;
+      box-shadow: inset 0 0 0 1px #fecaca;
     }
 
     /* クリック可能感 */
@@ -683,8 +713,8 @@
     }
 
     .agent-calendar .fc-button:hover {
-      background: #eef2ff;
-      border-color: #a5b4fc;
+      background: #fff1f2;
+      border-color: #fecaca;
     }
 
     .agent-calendar .fc-col-header-cell-cushion {
@@ -784,7 +814,7 @@
       border-color: transparent;
       color: #fff;
       background: linear-gradient(90deg, var(--accent-grad-from), var(--accent-grad-to));
-      box-shadow: 0 8px 20px rgba(79, 70, 229, .25);
+      box-shadow: 0 8px 20px rgba(239, 68, 68, .25);
     }
 
     .time-slot-btn:disabled {
@@ -802,9 +832,9 @@
     }
 
     .time-slot-btn:hover {
-      border-color: #818cf8;
+      border-color: #ef4444;
       color: var(--accent-strong);
-      background: #eef2ff;
+      background: #fff1f2;
     }
 
     .time-empty {
@@ -850,8 +880,8 @@
 
     /* ==== クリックされた日付のハイライト（選択日） ==== */
     .agent-calendar .fc-daygrid-day.is-selected .fc-daygrid-day-frame {
-      background: #e0e7ff;
-      box-shadow: inset 0 0 0 2px #6366f1;
+      background: #fee2e2;
+      box-shadow: inset 0 0 0 2px #ef4444;
     }
 
     .agent-calendar .fc-daygrid-day.is-selected .fc-daygrid-day-number {
@@ -921,6 +951,68 @@
       opacity: 1 !important;
       /* 透明にしたくないなら */
       transform: none !important;
+    }
+
+    @keyframes introGlow {
+      0% {
+        transform: translate3d(-2%, -1%, 0) scale(1);
+        opacity: .62;
+      }
+
+      100% {
+        transform: translate3d(3%, 2%, 0) scale(1.08);
+        opacity: .9;
+      }
+    }
+
+    @keyframes introSlideOut {
+      0% {
+        opacity: 1;
+        transform: translate3d(0, 0, 0) rotateY(0deg) scale(1);
+        filter: blur(0);
+      }
+
+      58% {
+        opacity: .92;
+        transform: translate3d(-22%, -1%, 0) rotateY(9deg) scale(.975);
+        filter: blur(2px);
+      }
+
+      100% {
+        opacity: 0;
+        transform: translate3d(-62%, -2%, 0) rotateY(16deg) scale(.94);
+        filter: blur(10px);
+      }
+    }
+
+    @keyframes introCardLift {
+      0% {
+        transform: translateY(0) scale(1);
+        box-shadow: 0 26px 64px rgba(15, 23, 42, .24);
+      }
+
+      100% {
+        transform: translateY(-12px) scale(.975);
+        box-shadow: 0 12px 34px rgba(15, 23, 42, .18);
+      }
+    }
+
+    @keyframes pageReveal {
+      0% {
+        opacity: 0;
+        transform: translate3d(88px, 0, 0) scale(.965);
+        filter: blur(10px);
+      }
+
+      55% {
+        opacity: 1;
+      }
+
+      100% {
+        opacity: 1;
+        transform: translate3d(0, 0, 0) scale(1);
+        filter: blur(0);
+      }
     }
   </style>
 </head>
@@ -1474,12 +1566,13 @@
     const mainPage = document.getElementById('mainPage');
 
     function enterDiagnosisScreen() {
+      if (!introScreen || introScreen.classList.contains('is-leaving')) return;
       introScreen?.classList.add('is-leaving');
       mainPage?.classList.add('is-entered');
       document.body.classList.remove('intro-active');
       window.setTimeout(() => {
         if (introScreen) introScreen.style.display = 'none';
-      }, 600);
+      }, 900);
     }
 
     startDiagnosisBtn?.addEventListener('click', enterDiagnosisScreen);
