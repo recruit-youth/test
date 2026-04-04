@@ -1516,6 +1516,9 @@
           div.className = 'agent-card';
 
           const agentName = agent.name || `agent-${idx + 1}`;
+          let agentSlotCandidates = Array.isArray(agent.slotCandidates) && agent.slotCandidates.length
+            ? agent.slotCandidates.slice()
+            : DEFAULT_INTERVIEW_SLOTS.slice();
 
           div.innerHTML = `
   <div class="agent-tag">${agent.category || '20代向け特化'}</div>
@@ -1594,8 +1597,8 @@
           function renderSlots(dateStr) {
             const hasDateAvailability = availabilityLoaded &&
               Object.prototype.hasOwnProperty.call(availableSlotsByDate, dateStr);
-            const availableSlots = hasDateAvailability ? (availableSlotsByDate[dateStr] || []) : DEFAULT_INTERVIEW_SLOTS.slice();
-            const allSlots = DEFAULT_INTERVIEW_SLOTS.slice();
+            const availableSlots = hasDateAvailability ? (availableSlotsByDate[dateStr] || []) : agentSlotCandidates.slice();
+            const allSlots = agentSlotCandidates.slice();
             slotGridEl.innerHTML = '';
             emptyEl.classList.add('hidden');
 
@@ -1620,11 +1623,13 @@
                 if (reservationSubmitting) return;
                 clearConflictMessage();
 
+                const existingReservation = reservationSelections.find(r => r.agent_name === agentName);
                 const reservationPayload = {
                   action: 'reserve_slot',
                   agent_name: agentName,
                   date: dateStr,
-                  time: slot
+                  time: slot,
+                  hold_token: existingReservation?.hold_token || ''
                 };
 
                 reservationSubmitting = true;
@@ -1649,16 +1654,17 @@
                   }
 
                   const selectedDateLabel = formatJPDateWithDow(dateStr);
-                  statusEl.textContent = `${selectedDateLabel} ${slot} を予約済み`;
-                  openBtn.disabled = true;
-                  openBtn.textContent = '予約済み';
+                  statusEl.textContent = `${selectedDateLabel} ${slot} を選択中`;
+                  openBtn.textContent = '面談日程を変更する';
 
                   const reservation = {
                     agent_name: agentName,
                     date: dateStr,
                     date_label: selectedDateLabel,
                     time: slot,
-                    reservation_hash: json.reservation_hash || ''
+                    reservation_hash: json.reservation_hash || '',
+                    hold_token: json.hold_token || '',
+                    hold_expires_at_iso: json.hold_expires_at_iso || ''
                   };
                   const existingIdx = reservationSelections.findIndex(r => r.agent_name === reservation.agent_name);
                   if (existingIdx >= 0) {
@@ -1723,7 +1729,7 @@
                 body: JSON.stringify({
                   action: 'get_availability',
                   agent_name: agentName,
-                  slot_candidates: DEFAULT_INTERVIEW_SLOTS
+                  slot_candidates: agentSlotCandidates
                 })
               });
               const text = await resp.text();
@@ -1732,6 +1738,9 @@
                 throw new Error((json && json.error) || `status ${resp.status}`);
               }
               availableSlotsByDate = json.available_slots_by_date || {};
+              if (Array.isArray(json.slot_candidates) && json.slot_candidates.length) {
+                agentSlotCandidates = json.slot_candidates.slice();
+              }
               availabilityLoaded = true;
               busyDays = new Set(json.busy_days || []);
 
