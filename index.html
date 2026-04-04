@@ -1265,6 +1265,7 @@
   </div>
   <script>
     let hasAnyReservation = false;
+    let reservationSelections = [];
     const completeBtn = document.getElementById("completeBtn");
     let confirmedDateObj = null; // ★追加（Date型）
     (function () {
@@ -1385,6 +1386,8 @@
       let selectedAgent = null;   // 今選択中のエージェント
       let isCalendarOpen = false; // カレンダー表示中かどうか
       function renderAgents(agents) {
+        reservationSelections = [];
+        window.reservationSelections = reservationSelections;
 
         agentGrid.innerHTML = '';
 
@@ -1449,10 +1452,24 @@
 
             confirmedTimeStr = String(timeSelect.value).replace(/\s*〇\s*$/, '');
 
-            statusEl.textContent =
-              `${formatJPDateWithDowFromDate(confirmedDateObj)} ${confirmedTimeStr} を選択中`;
+            const selectedDateLabel = formatJPDateWithDowFromDate(confirmedDateObj);
+            statusEl.textContent = `${selectedDateLabel} ${confirmedTimeStr} を選択中`;
 
-            hasAnyReservation = true;
+            const reservation = {
+              agent_name: agent.name || `agent-${idx + 1}`,
+              date: confirmedDateStr || '',
+              date_label: selectedDateLabel,
+              time: confirmedTimeStr
+            };
+            const existingIdx = reservationSelections.findIndex(r => r.agent_name === reservation.agent_name);
+            if (existingIdx >= 0) {
+              reservationSelections[existingIdx] = reservation;
+            } else {
+              reservationSelections.push(reservation);
+            }
+            window.reservationSelections = reservationSelections;
+
+            hasAnyReservation = reservationSelections.length > 0;
             completeBtn.disabled = false;
             completeBtn.classList.remove("disabled");
 
@@ -1567,6 +1584,8 @@
         resultSection.classList.remove('hidden');
         // 結果ページ表示のたびに「完了」を初期化（灰色）
         hasAnyReservation = false;
+        reservationSelections = [];
+        window.reservationSelections = reservationSelections;
         completeBtn.disabled = true;
         completeBtn.classList.add("disabled");
         resultSection.scrollIntoView({ behavior: 'smooth' });
@@ -1702,6 +1721,8 @@
 
         // ★完了を灰色へ
         hasAnyReservation = false;
+        reservationSelections = [];
+        window.reservationSelections = reservationSelections;
         completeBtn.disabled = true;
 
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1731,6 +1752,9 @@
 
       // ★ window 経由で取得
       const payload = window.collectFormData();
+      const completedAt = new Date();
+      const reservedDetails = Array.isArray(window.reservationSelections) ? window.reservationSelections : [];
+      const completedAtJst = completedAt.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', hour12: false });
 
       try {
         await fetch(window.WEB_APP_URL, {
@@ -1740,7 +1764,12 @@
             action: 'reserve',
             ...payload,
             reserved: true,
-            reserved_at: new Date().toISOString()
+            reserved_at: completedAt.toISOString(),
+            completed_at_iso: completedAt.toISOString(),
+            completed_at_jst: completedAtJst,
+            selected_agents: reservedDetails.map(r => r.agent_name).join(','),
+            reservation_count: reservedDetails.length,
+            reservation_details: reservedDetails
           })
         });
       } catch (e) {
