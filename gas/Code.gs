@@ -430,10 +430,10 @@ function handleReserveSlot_(payload) {
 
   try {
     var sheet = getOrCreateSheet_(RESERVATIONS_SHEET_NAME);
-    migrateReservationsHeadersToJapanese_(sheet);
     var hash = buildReservationHash_(agentName, date, time);
     var latest = getLatestReservationByHash_(sheet, hash);
     var now = new Date();
+    var latestRowNumber = latest ? latest._rowNumber : 0;
 
     if (latest) {
       var latestStatus = normalizeReservationStatus_(latest.status);
@@ -455,8 +455,8 @@ function handleReserveSlot_(payload) {
             hold_token: latestHoldToken,
             hold_expires_at_iso: renewedExpiry.toISOString(),
             updated_at_iso: now.toISOString(),
-            updated_at_jst: Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy/MM/dd/ HH:mm')
-          });
+            updated_at_jst: formatJstMinute_(now)
+          }, latestRowNumber);
 
           return {
             ok: true,
@@ -481,9 +481,11 @@ function handleReserveSlot_(payload) {
       status: RESERVATION_STATUS.HOLDING,
       hold_token: holdToken,
       hold_expires_at_iso: holdExpiry.toISOString(),
+      booked_at_iso: '',
+      booked_at_jst: '',
       updated_at_iso: now.toISOString(),
-      updated_at_jst: Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy/MM/dd/ HH:mm')
-    });
+      updated_at_jst: formatJstMinute_(now)
+    }, latestRowNumber);
 
     return {
       ok: true,
@@ -524,7 +526,6 @@ function handleUpdateReservationStatus_(payload) {
 
   try {
     var sheet = getOrCreateSheet_(RESERVATIONS_SHEET_NAME);
-    migrateReservationsHeadersToJapanese_(sheet);
     var latest = getLatestReservationByHash_(sheet, hash);
     if (!latest) {
       return { ok: false, error: 'reservation not found' };
@@ -539,9 +540,11 @@ function handleUpdateReservationStatus_(payload) {
       status: status,
       hold_token: '',
       hold_expires_at_iso: '',
+      booked_at_iso: status === RESERVATION_STATUS.BOOKED ? now.toISOString() : String(latest.booked_at_iso || '').trim(),
+      booked_at_jst: status === RESERVATION_STATUS.BOOKED ? formatJstMinute_(now) : String(latest.booked_at_jst || '').trim(),
       updated_at_iso: now.toISOString(),
-      updated_at_jst: Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy/MM/dd/ HH:mm')
-    });
+      updated_at_jst: formatJstMinute_(now)
+    }, latest._rowNumber);
 
     return { ok: true, reservation_hash: hash, status: status };
   } finally {
@@ -551,7 +554,6 @@ function handleUpdateReservationStatus_(payload) {
 
 function finalizeReservationDetails_(details, now) {
   var sheet = getOrCreateSheet_(RESERVATIONS_SHEET_NAME);
-  migrateReservationsHeadersToJapanese_(sheet);
   var results = [];
 
   for (var i = 0; i < details.length; i += 1) {
@@ -602,10 +604,10 @@ function finalizeReservationDetails_(details, now) {
       hold_token: latestHoldToken,
       hold_expires_at_iso: latest.hold_expires_at_iso || '',
       booked_at_iso: now.toISOString(),
-      booked_at_jst: Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy/MM/dd/ HH:mm'),
+      booked_at_jst: formatJstMinute_(now),
       updated_at_iso: now.toISOString(),
-      updated_at_jst: Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy/MM/dd/ HH:mm')
-    });
+      updated_at_jst: formatJstMinute_(now)
+    }, latest._rowNumber);
 
     results.push({ reservation_hash: hash, status: RESERVATION_STATUS.BOOKED });
   }
@@ -664,16 +666,18 @@ function extractAgentSlots_(agent) {
 
 function loadReservationsForAgent_(agentName, startDate, days) {
   var sheet = getOrCreateSheet_(RESERVATIONS_SHEET_NAME);
-  var values = sheet.getDataRange().getValues();
+  var lastRow = sheet.getLastRow();
+  var lastCol = sheet.getLastColumn();
+  if (lastRow <= 1 || lastCol <= 0) return [];
+
+  var values = sheet.getRange(1, 1, lastRow, lastCol).getValues();
   if (values.length <= 1) return [];
 
-  var headers = values[0].map(function(v) { return normalizeHeader_(v); });
-  var idxHash = headers.indexOf('reservation_hash');
-  var idxAgent = headers.indexOf('agent_name');
-  var idxDate = headers.indexOf('date');
-  var idxTime = headers.indexOf('time');
-  var idxStatus = headers.indexOf('status');
-  var idxHoldExpires = headers.indexOf('hold_expires_at_iso');
+  var headers = values[0].map(function(v) { return String(v || '').trim(); });
+  var idx = getReservationHeaderIndexes_(headers);
+  if (idx.hash < 0 || idx.agent < 0 || idx.date < 0 || idx.time < 0 || idx.status < 0) {
+    return [];
+  }
 
   var startStr = Utilities.formatDate(startDate, 'Asia/Tokyo', 'yyyy-MM-dd');
   var end = new Date(startDate);
@@ -683,12 +687,12 @@ function loadReservationsForAgent_(agentName, startDate, days) {
   var byHash = {};
   for (var i = 1; i < values.length; i += 1) {
     var row = values[i];
-    var rowHash = idxHash >= 0 ? String(row[idxHash] || '').trim() : '';
-    var rowAgent = idxAgent >= 0 ? String(row[idxAgent] || '').trim() : '';
-    var rowDate = idxDate >= 0 ? String(row[idxDate] || '').trim() : '';
-    var rowTime = idxTime >= 0 ? String(row[idxTime] || '').trim() : '';
-    var rowStatus = idxStatus >= 0 ? String(row[idxStatus] || '').trim() : '';
-    var rowHoldExpires = idxHoldExpires >= 0 ? String(row[idxHoldExpires] || '').trim() : '';
+    var rowHash = String(row[idx.hash] || '').trim();
+    var rowAgent = String(row[idx.agent] || '').trim();
+    var rowDate = String(row[idx.date] || '').trim();
+    var rowTime = String(row[idx.time] || '').trim();
+    var rowStatus = String(row[idx.status] || '').trim();
+    var rowHoldExpires = idx.holdExpires >= 0 ? String(row[idx.holdExpires] || '').trim() : '';
 
     if (!rowHash || !rowAgent || !rowDate || !rowTime) continue;
     if (rowAgent !== agentName) continue;
@@ -712,43 +716,128 @@ function loadReservationsForAgent_(agentName, startDate, days) {
 }
 
 function getLatestReservationByHash_(sheet, hash) {
-  var values = sheet.getDataRange().getValues();
-  if (values.length <= 1) return null;
+  ensureReservationHeaders_(sheet);
+  var lastRow = sheet.getLastRow();
+  var lastCol = sheet.getLastColumn();
+  if (lastRow <= 1 || lastCol <= 0) return null;
 
-  var headers = values[0].map(function(v) { return normalizeHeader_(v); });
-  var idxHash = headers.indexOf('reservation_hash');
-  if (idxHash < 0) return null;
-
-  var idxAgent = headers.indexOf('agent_name');
-  var idxDate = headers.indexOf('date');
-  var idxTime = headers.indexOf('time');
-  var idxStatus = headers.indexOf('status');
-  var idxHoldToken = headers.indexOf('hold_token');
-  var idxHoldExpires = headers.indexOf('hold_expires_at_iso');
+  var values = sheet.getRange(1, 1, lastRow, lastCol).getValues();
+  var headers = values[0].map(function(v) { return String(v || '').trim(); });
+  var idx = getReservationHeaderIndexes_(headers);
+  if (idx.hash < 0) return null;
 
   var latest = null;
   for (var i = 1; i < values.length; i += 1) {
     var row = values[i];
-    if (String(row[idxHash] || '').trim() !== hash) continue;
+    if (String(row[idx.hash] || '').trim() !== hash) continue;
 
     latest = {
-      reservation_hash: String(row[idxHash] || '').trim(),
-      agent_name: idxAgent >= 0 ? String(row[idxAgent] || '').trim() : '',
-      date: idxDate >= 0 ? String(row[idxDate] || '').trim() : '',
-      time: idxTime >= 0 ? String(row[idxTime] || '').trim() : '',
-      status: idxStatus >= 0 ? String(row[idxStatus] || '').trim() : '',
-      hold_token: idxHoldToken >= 0 ? String(row[idxHoldToken] || '').trim() : '',
-      hold_expires_at_iso: idxHoldExpires >= 0 ? String(row[idxHoldExpires] || '').trim() : ''
+      _rowNumber: i + 1,
+      reservation_hash: String(row[idx.hash] || '').trim(),
+      agent_name: idx.agent >= 0 ? String(row[idx.agent] || '').trim() : '',
+      date: idx.date >= 0 ? String(row[idx.date] || '').trim() : '',
+      time: idx.time >= 0 ? String(row[idx.time] || '').trim() : '',
+      status: idx.status >= 0 ? String(row[idx.status] || '').trim() : '',
+      hold_token: idx.holdToken >= 0 ? String(row[idx.holdToken] || '').trim() : '',
+      hold_expires_at_iso: idx.holdExpires >= 0 ? String(row[idx.holdExpires] || '').trim() : '',
+      booked_at_iso: idx.bookedIso >= 0 ? String(row[idx.bookedIso] || '').trim() : '',
+      booked_at_jst: idx.bookedJst >= 0 ? String(row[idx.bookedJst] || '').trim() : '',
+      updated_at_iso: idx.updatedIso >= 0 ? String(row[idx.updatedIso] || '').trim() : '',
+      updated_at_jst: idx.updatedJst >= 0 ? String(row[idx.updatedJst] || '').trim() : ''
     };
   }
 
   return latest;
 }
 
-function appendReservationEvent_(sheet, obj) {
-  migrateReservationsHeadersToJapanese_(sheet);
+function appendReservationEvent_(sheet, obj, rowNumber) {
+  var headers = ensureReservationHeaders_(sheet);
   var localized = localizeReservationData_(obj);
-  appendObjectRowWithFirstHeader_(sheet, localized, '更新時間');
+  var changed = false;
+  Object.keys(localized).forEach(function(key) {
+    if (headers.indexOf(key) < 0) {
+      headers.push(key);
+      changed = true;
+    }
+  });
+
+  if (changed) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+
+  var row = [];
+  var targetRow = parseInt(rowNumber || 0, 10);
+  var canUpdate = !isNaN(targetRow) && targetRow > 1 && targetRow <= sheet.getLastRow();
+  if (canUpdate) {
+    row = sheet.getRange(targetRow, 1, 1, headers.length).getValues()[0];
+    while (row.length < headers.length) row.push('');
+  } else {
+    for (var i = 0; i < headers.length; i += 1) row.push('');
+  }
+
+  Object.keys(localized).forEach(function(key) {
+    var idx = headers.indexOf(key);
+    if (idx >= 0) row[idx] = toCellValue_(localized[key]);
+  });
+
+  if (canUpdate) {
+    sheet.getRange(targetRow, 1, 1, headers.length).setValues([row]);
+    return targetRow;
+  }
+
+  sheet.appendRow(row);
+  return sheet.getLastRow();
+}
+
+function ensureReservationHeaders_(sheet) {
+  migrateReservationsHeadersToJapanese_(sheet);
+
+  var headers = [];
+  var lastRow = sheet.getLastRow();
+  var lastCol = sheet.getLastColumn();
+  if (lastRow > 0 && lastCol > 0) {
+    headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0]
+      .map(function(v) { return String(v || '').trim(); })
+      .filter(function(v) { return v; });
+  }
+
+  var required = [];
+  var map = getReservationLabelMap_();
+  Object.keys(map).forEach(function(key) {
+    var label = map[key];
+    if (required.indexOf(label) < 0) required.push(label);
+  });
+
+  required.forEach(function(header) {
+    if (headers.indexOf(header) < 0) headers.push(header);
+  });
+
+  if (headers.indexOf('更新時間') < 0) {
+    headers.unshift('更新時間');
+  } else {
+    headers = headers.filter(function(h) { return h !== '更新時間'; });
+    headers.unshift('更新時間');
+  }
+
+  if (!headers.length) headers = ['更新時間'];
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  return headers;
+}
+
+function getReservationHeaderIndexes_(headers) {
+  return {
+    hash: findHeaderIndex_(headers, ['reservation_hash', '予約ハッシュ']),
+    agent: findHeaderIndex_(headers, ['agent_name', 'エージェント名']),
+    date: findHeaderIndex_(headers, ['date', '予約日']),
+    time: findHeaderIndex_(headers, ['time', '予約時間枠']),
+    status: findHeaderIndex_(headers, ['status', '予約ステータス']),
+    holdToken: findHeaderIndex_(headers, ['hold_token', '仮予約トークン']),
+    holdExpires: findHeaderIndex_(headers, ['hold_expires_at_iso', '仮予約期限ISO']),
+    bookedIso: findHeaderIndex_(headers, ['booked_at_iso', '確定時間ISO']),
+    bookedJst: findHeaderIndex_(headers, ['booked_at_jst', '確定時間']),
+    updatedIso: findHeaderIndex_(headers, ['updated_at_iso', '更新時間ISO']),
+    updatedJst: findHeaderIndex_(headers, ['updated_at_jst', '更新時間'])
+  };
 }
 
 function isBlockingReservation_(reservation, now) {
@@ -970,11 +1059,16 @@ function localizeReservationData_(obj) {
   ['updated_at_jst', 'booked_at_jst'].forEach(function(k) {
     var v = clone[k];
     if (v) {
+      var raw = String(v || '').trim();
+      if (/^\d{4}\/\d{2}\/\d{2}\/ \d{2}:\d{2}$/.test(raw)) {
+        clone[k] = raw;
+        return;
+      }
       var d = new Date(v);
       if (String(d) !== 'Invalid Date') {
         clone[k] = formatJstMinute_(d);
       } else {
-        clone[k] = String(v || '').slice(0, 16).replace(/-/g, '/').replace('T', '/ ');
+        clone[k] = raw;
       }
     }
   });

@@ -16,4 +16,4 @@
 
 - `action: "diagnose"`: `agents` シートから回答条件に近いエージェントを最大3件返却
 - `action: "reserve"`: 面談完了時に回答内容 + 完了時刻 + 選択エージェント情報を `applicants` に1行追記（A列は完了時間、ヘッダーは日本語化）
-- `reservations` シート: 予約イベントを日本語ヘッダーで管理（時間項目は `yyyy/MM/dd/ HH:mm`）
+- `reservations` シート: 予約ごとに1行で最新状態を更新して管理（日本語ヘッダー、時間項目は `yyyy/MM/dd/ HH:mm`）
