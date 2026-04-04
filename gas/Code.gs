@@ -1,7 +1,18 @@
 const SPREADSHEET_ID = '14QAijJ_rHXxK7Kbr6704lZ2iku4VJu_ouuv5J3Ifc08';
 const AGENTS_SHEET_NAME = 'agents';
 const APPLICATIONS_SHEET_NAME = 'applications';
+const RESERVATIONS_SHEET_NAME = 'reservations';
 const DEFAULT_TOP_AGENT_COUNT = 3;
+const DEFAULT_TIME_SLOTS = [
+  '10:00～11:00',
+  '11:00～12:00',
+  '12:00～13:00',
+  '13:00～14:00',
+  '14:00～15:00',
+  '15:00～16:00',
+  '16:00～17:00',
+  '17:00～18:00'
+];
 
 function doPost(e) {
   try {
@@ -14,10 +25,16 @@ function doPost(e) {
     if (action === 'reserve') {
       return jsonOutput_(handleReserve_(payload));
     }
+    if (action === 'get_availability') {
+      return jsonOutput_(handleGetAvailability_(payload));
+    }
+    if (action === 'reserve_slot') {
+      return jsonOutput_(handleReserveSlot_(payload));
+    }
 
     return jsonOutput_({
       ok: false,
-      error: 'Unsupported action. Use diagnose or reserve.'
+      error: 'Unsupported action. Use diagnose, reserve, get_availability, or reserve_slot.'
     });
   } catch (error) {
     return jsonOutput_({
@@ -311,6 +328,94 @@ function handleReserve_(payload) {
   };
 }
 
+function handleGetAvailability_(payload) {
+  const agentName = String(payload.agent_name || '').trim();
+  if (!agentName) {
+    return { ok: false, error: 'agent_name is required' };
+  }
+
+  const days = Math.max(7, Math.min(parseInt(payload.days || '31', 10) || 31, 60));
+  const slotCandidates = splitMulti_(payload.slot_candidates);
+  const baseSlots = slotCandidates.length ? slotCandidates : DEFAULT_TIME_SLOTS;
+
+  const now = new Date();
+  const startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const reservations = loadReservationsForAgent_(agentName, startDate, days);
+
+  const takenByDate = {};
+  reservations.forEach(r => {
+    if (!takenByDate[r.date]) takenByDate[r.date] = {};
+    takenByDate[r.date][r.time] = true;
+  });
+
+  const available = {};
+  const busyDays = [];
+
+  for (var i = 0; i < days; i += 1) {
+    const d = new Date(startDate);
+    d.setDate(startDate.getDate() + i);
+    const dateStr = Utilities.formatDate(d, 'Asia/Tokyo', 'yyyy-MM-dd');
+    const weekday = d.getDay();
+
+    if (weekday === 0 || weekday === 6) {
+      busyDays.push(dateStr);
+      available[dateStr] = [];
+      continue;
+    }
+
+    const taken = takenByDate[dateStr] || {};
+    const free = baseSlots.filter(slot => !taken[slot]);
+    available[dateStr] = free;
+    if (!free.length) {
+      busyDays.push(dateStr);
+    }
+  }
+
+  return {
+    ok: true,
+    agent_name: agentName,
+    available_slots_by_date: available,
+    busy_days: busyDays
+  };
+}
+
+function handleReserveSlot_(payload) {
+  const agentName = String(payload.agent_name || '').trim();
+  const date = String(payload.date || '').trim();
+  const time = String(payload.time || '').trim();
+
+  if (!agentName || !date || !time) {
+    return { ok: false, error: 'agent_name, date, time are required' };
+  }
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+
+  try {
+    const sheet = getOrCreateSheet_(RESERVATIONS_SHEET_NAME);
+    const hash = buildReservationHash_(agentName, date, time);
+
+    if (reservationExistsByHash_(sheet, hash)) {
+      return { ok: false, conflict: true, error: 'その時間枠はすでに予約済みです。' };
+    }
+
+    const now = new Date();
+    appendObjectRow_(sheet, {
+      reservation_hash: hash,
+      agent_name: agentName,
+      date: date,
+      time: time,
+      status: 'booked',
+      booked_at_iso: now.toISOString(),
+      booked_at_jst: Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm:ss')
+    });
+
+    return { ok: true, reservation_hash: hash };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function appendObjectRow_(sheet, obj) {
   const keys = Object.keys(obj);
   if (!keys.length) return;
@@ -440,4 +545,65 @@ function findHeaderIndex_(headers, candidates) {
 function parseAgeNumber_(ageText) {
   const m = String(ageText || '').match(/\d+/);
   return m ? parseInt(m[0], 10) : NaN;
+}
+
+
+function loadReservationsForAgent_(agentName, startDate, days) {
+  const sheet = getOrCreateSheet_(RESERVATIONS_SHEET_NAME);
+  const values = sheet.getDataRange().getValues();
+  if (values.length <= 1) return [];
+
+  const headers = values[0].map(v => normalizeHeader_(v));
+  const idxAgent = headers.indexOf('agent_name');
+  const idxDate = headers.indexOf('date');
+  const idxTime = headers.indexOf('time');
+  const idxStatus = headers.indexOf('status');
+
+  const startStr = Utilities.formatDate(startDate, 'Asia/Tokyo', 'yyyy-MM-dd');
+  const end = new Date(startDate);
+  end.setDate(startDate.getDate() + days - 1);
+  const endStr = Utilities.formatDate(end, 'Asia/Tokyo', 'yyyy-MM-dd');
+
+  const rows = [];
+  for (var i = 1; i < values.length; i += 1) {
+    const row = values[i];
+    const rowAgent = idxAgent >= 0 ? String(row[idxAgent] || '').trim() : '';
+    const rowDate = idxDate >= 0 ? String(row[idxDate] || '').trim() : '';
+    const rowTime = idxTime >= 0 ? String(row[idxTime] || '').trim() : '';
+    const rowStatus = idxStatus >= 0 ? String(row[idxStatus] || '').trim().toLowerCase() : 'booked';
+
+    if (!rowAgent || !rowDate || !rowTime) continue;
+    if (rowAgent !== agentName) continue;
+    if (rowStatus && rowStatus !== 'booked') continue;
+    if (rowDate < startStr || rowDate > endStr) continue;
+
+    rows.push({ agent_name: rowAgent, date: rowDate, time: rowTime });
+  }
+
+  return rows;
+}
+
+function reservationExistsByHash_(sheet, hash) {
+  const values = sheet.getDataRange().getValues();
+  if (values.length <= 1) return false;
+
+  const headers = values[0].map(v => normalizeHeader_(v));
+  const idxHash = headers.indexOf('reservation_hash');
+  if (idxHash < 0) {
+    return false;
+  }
+
+  for (var i = 1; i < values.length; i += 1) {
+    if (String(values[i][idxHash] || '').trim() === hash) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function buildReservationHash_(agentName, date, time) {
+  return [agentName, date, time]
+    .map(v => String(v || '').trim())
+    .join('|');
 }

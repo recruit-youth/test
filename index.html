@@ -603,6 +603,18 @@
       border-top: 1px dashed #e5e7eb;
     }
 
+    .calendar-hint {
+      font-size: 11px;
+      color: #6b7280;
+      margin: 6px 0 2px;
+    }
+
+    .availability-loading {
+      font-size: 11px;
+      color: #6b7280;
+      margin-top: 6px;
+    }
+
     .time-area select {
       border-radius: 999px;
       font-size: 12px;
@@ -637,6 +649,56 @@
       margin-top: 6px;
       padding: 6px;
       font-size: 12px;
+    }
+
+    .time-slot-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    @media (max-width:520px) {
+      .time-slot-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .time-slot-btn {
+      border: 1px solid #e5e7eb;
+      background: #fff;
+      color: #374151;
+      border-radius: 12px;
+      padding: 8px 10px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .time-slot-btn.is-selected {
+      border-color: transparent;
+      color: #fff;
+      background: linear-gradient(90deg, var(--accent-grad-from), var(--accent-grad-to));
+      box-shadow: 0 8px 20px rgba(239, 68, 68, .25);
+    }
+
+    .time-slot-btn:disabled {
+      cursor: not-allowed;
+      color: #9ca3af;
+      border-color: #e5e7eb;
+      background: #f9fafb;
+      box-shadow: none;
+    }
+
+    .time-slot-btn:hover {
+      border-color: #ef4444;
+      color: #b91c1c;
+      background: #fff1f2;
+    }
+
+    .time-empty {
+      margin-top: 8px;
+      font-size: 11px;
+      color: #9ca3af;
     }
 
     /* 完了ボタン */
@@ -685,6 +747,15 @@
     .agent-calendar .fc-daygrid-day.is-selected .fc-daygrid-day-number {
       color: #b91c1c;
       font-weight: 700;
+    }
+
+    .agent-calendar .fc-daygrid-day.is-unavailable .fc-daygrid-day-frame {
+      background: #f9fafb;
+      box-shadow: none;
+    }
+
+    .agent-calendar .fc-daygrid-day.is-unavailable .fc-daygrid-day-number {
+      color: #d1d5db;
     }
 
     .reserve-status {
@@ -1266,8 +1337,18 @@
   <script>
     let hasAnyReservation = false;
     let reservationSelections = [];
+    let reservationSubmitting = false;
     const completeBtn = document.getElementById("completeBtn");
-    let confirmedDateObj = null; // ★追加（Date型）
+    const DEFAULT_INTERVIEW_SLOTS = [
+      "10:00～11:00",
+      "11:00～12:00",
+      "12:00～13:00",
+      "13:00～14:00",
+      "14:00～15:00",
+      "15:00～16:00",
+      "16:00～17:00",
+      "17:00～18:00"
+    ];
     (function () {
       const steps = Array.from(document.querySelectorAll('.step'));
       const stepTotalEl = document.getElementById('step-total');
@@ -1395,12 +1476,13 @@
           const div = document.createElement('div');
           div.className = 'agent-card';
 
+          const agentName = agent.name || `agent-${idx + 1}`;
+
           div.innerHTML = `
   <div class="agent-tag">${agent.category || '20代向け特化'}</div>
-  <div class="agent-name">${agent.name}</div>
+  <div class="agent-name">${agentName}</div>
   <div class="agent-desc">${agent.description || ''}</div>
 
-  <!-- ★ なぜこの会社？ -->
   <div class="agent-meta">
     ${(agent.reasons || []).map(r => `・${r}`).join('<br>')}
   </div>
@@ -1411,11 +1493,13 @@
   </div>
 
   <div class="agent-calendar hidden">
+    <div class="calendar-hint">日付を選ぶと、空いている時間だけ表示されます。</div>
+    <div class="availability-loading hidden">空き枠を読み込み中です…</div>
     <div id="calendar-${idx}"></div>
     <div class="time-area hidden">
-      <select>
-        <option value="">時間を選択</option>
-      </select>
+      <div class="calendar-hint">希望時間を選択してください</div>
+      <div class="time-slot-grid"></div>
+      <div class="time-empty hidden">この日は空き枠がありません。別日を選択してください。</div>
     </div>
   </div>
 `;
@@ -1427,167 +1511,213 @@
           const calWrap = div.querySelector('.agent-calendar');
           const calEl = div.querySelector(`#calendar-${idx}`);
           const timeArea = div.querySelector('.time-area');
-          const timeSelect = timeArea.querySelector('select');
+          const loadingEl = div.querySelector('.availability-loading');
+          const slotGridEl = div.querySelector('.time-slot-grid');
+          const emptyEl = div.querySelector('.time-empty');
 
           let calendar;
           let selectedDate = null;
-          // この会社の「確定済み（時間まで選択済み）」の表示用データ
-          let confirmedDateStr = null; // 'YYYY-MM-DD'
-          let confirmedTimeStr = null; // '10:00～11:00' など
+          let availableSlotsByDate = {};
+          let busyDays = new Set();
 
-          // 曜日表示用
           const DOW = ['日', '月', '火', '水', '木', '金', '土'];
 
-          function formatJPDateWithDowFromDate(d) {
-            if (!d) return '';
+          function formatJPDateWithDow(dateStr) {
+            const d = dateStr ? new Date(`${dateStr}T00:00:00`) : null;
+            if (!d || Number.isNaN(d.getTime())) return '';
             const m = d.getMonth() + 1;
             const day = d.getDate();
             const dow = DOW[d.getDay()];
             return `${m}月${day}日（${dow}）`;
           }
 
-          // timeSelect change は一度だけ登録（重複防止）
-          timeSelect.addEventListener('change', () => {
-            if (!timeSelect.value) return;
+          function markBusyDays() {
+            if (!calEl) return;
+            calEl.querySelectorAll('.fc-daygrid-day').forEach(dayEl => {
+              const date = dayEl.getAttribute('data-date');
+              dayEl.classList.toggle('is-unavailable', !!(date && busyDays.has(date)));
+            });
+          }
 
-            confirmedTimeStr = String(timeSelect.value).replace(/\s*〇\s*$/, '');
+          function renderSlots(dateStr) {
+            const slots = availableSlotsByDate[dateStr] || [];
+            slotGridEl.innerHTML = '';
+            emptyEl.classList.add('hidden');
 
-            const selectedDateLabel = formatJPDateWithDowFromDate(confirmedDateObj);
-            statusEl.textContent = `${selectedDateLabel} ${confirmedTimeStr} を選択中`;
-
-            const reservation = {
-              agent_name: agent.name || `agent-${idx + 1}`,
-              date: confirmedDateStr || '',
-              date_label: selectedDateLabel,
-              time: confirmedTimeStr
-            };
-            const existingIdx = reservationSelections.findIndex(r => r.agent_name === reservation.agent_name);
-            if (existingIdx >= 0) {
-              reservationSelections[existingIdx] = reservation;
-            } else {
-              reservationSelections.push(reservation);
+            if (!slots.length) {
+              emptyEl.classList.remove('hidden');
+              return;
             }
-            window.reservationSelections = reservationSelections;
 
-            hasAnyReservation = reservationSelections.length > 0;
-            completeBtn.disabled = false;
-            completeBtn.classList.remove("disabled");
+            slots.forEach(slot => {
+              const btn = document.createElement('button');
+              btn.type = 'button';
+              btn.className = 'time-slot-btn';
+              btn.textContent = slot;
+              btn.addEventListener('click', async () => {
+                if (reservationSubmitting) return;
 
-            calWrap.classList.add('hidden');
-            timeArea.classList.add('hidden');
+                const reservationPayload = {
+                  action: 'reserve_slot',
+                  agent_name: agentName,
+                  date: dateStr,
+                  time: slot
+                };
 
-            timeSelect.innerHTML = `
-    <option value="" disabled selected>
-      面談時間を選択してください
-    </option>
-  `;
-          });
+                reservationSubmitting = true;
+                btn.disabled = true;
+                const oldText = btn.textContent;
+                btn.textContent = '確保中...';
 
-          openBtn.addEventListener('click', () => {
+                try {
+                  const resp = await fetch(window.WEB_APP_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify(reservationPayload)
+                  });
+                  const text = await resp.text();
+                  const json = JSON.parse(text);
 
+                  if (!resp.ok || !json.ok) {
+                    throw new Error((json && json.error) || `status ${resp.status}`);
+                  }
 
+                  const selectedDateLabel = formatJPDateWithDow(dateStr);
+                  statusEl.textContent = `${selectedDateLabel} ${slot} を予約済み`;
 
-            // 他のエージェントのカレンダーを閉じる
+                  const reservation = {
+                    agent_name: agentName,
+                    date: dateStr,
+                    date_label: selectedDateLabel,
+                    time: slot,
+                    reservation_hash: json.reservation_hash || ''
+                  };
+                  const existingIdx = reservationSelections.findIndex(r => r.agent_name === reservation.agent_name);
+                  if (existingIdx >= 0) {
+                    reservationSelections[existingIdx] = reservation;
+                  } else {
+                    reservationSelections.push(reservation);
+                  }
+                  window.reservationSelections = reservationSelections;
+
+                  hasAnyReservation = reservationSelections.length > 0;
+                  completeBtn.disabled = !hasAnyReservation;
+                  if (hasAnyReservation) {
+                    completeBtn.classList.remove('disabled');
+                  }
+
+                  await loadAvailability();
+                  calWrap.classList.add('hidden');
+                  timeArea.classList.add('hidden');
+                } catch (err) {
+                  console.error('reserve_slot error:', err);
+                  alert('その枠は先に埋まりました。最新の空き枠を表示します。');
+                  await loadAvailability();
+                  renderSlots(dateStr);
+                } finally {
+                  reservationSubmitting = false;
+                  btn.disabled = false;
+                  btn.textContent = oldText;
+                }
+              });
+              slotGridEl.appendChild(btn);
+            });
+          }
+
+          async function loadAvailability() {
+            loadingEl.classList.remove('hidden');
+            try {
+              const resp = await fetch(window.WEB_APP_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({
+                  action: 'get_availability',
+                  agent_name: agentName,
+                  slot_candidates: DEFAULT_INTERVIEW_SLOTS
+                })
+              });
+              const text = await resp.text();
+              const json = JSON.parse(text);
+              if (!resp.ok || !json.ok) {
+                throw new Error((json && json.error) || `status ${resp.status}`);
+              }
+              availableSlotsByDate = json.available_slots_by_date || {};
+              busyDays = new Set(json.busy_days || []);
+
+              if (calendar) {
+                markBusyDays();
+              }
+            } catch (err) {
+              console.error('get_availability error:', err);
+              availableSlotsByDate = {};
+              busyDays = new Set();
+            } finally {
+              loadingEl.classList.add('hidden');
+            }
+          }
+
+          openBtn.addEventListener('click', async () => {
             document.querySelectorAll('.agent-calendar').forEach(el => {
               if (el !== calWrap) {
                 el.classList.add('hidden');
               }
             });
 
-            // 時間選択をリセット
-            timeArea.classList.add('hidden');
-            timeSelect.innerHTML = `
-             <option value="" disabled selected>
-                面談時間を選択してください
-              </option>
-                `;
-
-            // このエージェントのカレンダーを開閉
             const isHidden = calWrap.classList.contains('hidden');
             calWrap.classList.toggle('hidden', !isHidden);
-
-
             if (!isHidden) {
               timeArea.classList.add('hidden');
+              return;
             }
 
-            // すでに生成済みなら終了
+            await loadAvailability();
+
             if (!calendar) {
               calendar = new FullCalendar.Calendar(calEl, {
                 initialView: 'dayGridMonth',
                 locale: 'ja',
                 height: 'auto',
-
-                // ★ これを追加（todayボタンを出さない）
                 headerToolbar: {
                   left: 'prev,next',
                   center: 'title',
-                  right: ''   // today を置かない
+                  right: ''
                 },
-
                 dateClick: (info) => {
-                  // ==== クリックされた日付を色付け（選択状態） ====
-                  // いったんこのカレンダー内の選択状態を全部解除
+                  const dateStr = info.dateStr;
+
+                  if (busyDays.has(dateStr)) {
+                    timeArea.classList.remove('hidden');
+                    slotGridEl.innerHTML = '';
+                    emptyEl.classList.remove('hidden');
+                    return;
+                  }
+
                   calEl.querySelectorAll('.fc-daygrid-day.is-selected').forEach(el => {
                     el.classList.remove('is-selected');
                   });
-
-                  // クリックしたセルに選択状態を付与
                   info.dayEl.classList.add('is-selected');
+                  selectedDate = dateStr;
 
-                  confirmedDateStr = info.dateStr;  // 文字列も必要なら残す
-                  confirmedDateObj = info.date;     // ★これが本命
-
-                  // （任意）選択した日付を保持したいなら
-                  selectedDate = info.dateStr;
-
-                  // ==== 既存処理（時間選択を表示） ====
                   timeArea.classList.remove('hidden');
-                  timeSelect.innerHTML = `
-                  <option value="" disabled selected>
-                   面談時間を選択してください
-                     </option>
-                      `;
-
-                  ["10:00～11:00", "11:00～12:00", "12:00～13:00", "13:00～14:00", "14:00～15:00", "15:00～16:00", "16:00～17:00", "17:00～18:00"]
-                    .forEach(t => {
-                      const opt = document.createElement('option');
-                      opt.textContent = `${t} 〇`;
-                      timeSelect.appendChild(opt);
-                    });
+                  renderSlots(dateStr);
                 }
               });
             }
 
-            // ★重要：開くたびに必ず render
             calendar.render();
+            markBusyDays();
           });
-
         });
 
-        function completeReservation() {
-          hasAnyReservation = true;
-          updateCompleteButton();
-        }
-
-        function updateCompleteButton() {
-          if (hasAnyReservation) {
-            completeBtn.disabled = false;
-            completeBtn.classList.remove("disabled");
-          }
-        }
-
-        // ✅ 結果ページ表示（前の画面を隠す）
         const wizardArea = document.getElementById('wizardArea');
         if (wizardArea) wizardArea.classList.add('hidden');
 
         resultSection.classList.remove('hidden');
-        // 結果ページ表示のたびに「完了」を初期化（灰色）
         hasAnyReservation = false;
         reservationSelections = [];
         window.reservationSelections = reservationSelections;
         completeBtn.disabled = true;
-        completeBtn.classList.add("disabled");
+        completeBtn.classList.add('disabled');
         resultSection.scrollIntoView({ behavior: 'smooth' });
       }
 
@@ -1732,48 +1862,60 @@
     })();
 
     completeBtn.addEventListener('click', async () => {
+      if (reservationSubmitting) return;
 
-      // ★ ここで送客シートに送信
-      await sendToSheet();
+      reservationSubmitting = true;
+      completeBtn.disabled = true;
 
-      // 診断・結果を非表示
-      document.querySelector('main').classList.add('hidden');
+      try {
+        await sendToSheet();
 
+        document.querySelector('main').classList.add('hidden');
 
-      // 面談予約完了画面を表示
-      const reserveResult = document.getElementById('reserveResult');
-      reserveResult.classList.remove('hidden');
-
-      // 画面上部へスクロール
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+        const reserveResult = document.getElementById('reserveResult');
+        reserveResult.classList.remove('hidden');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } catch (e) {
+        console.error('complete reservation error:', e);
+        alert('予約処理中にエラーが発生しました。時間をおいて再度お試しください。');
+      } finally {
+        reservationSubmitting = false;
+        completeBtn.disabled = !hasAnyReservation;
+      }
     });
 
     async function sendToSheet() {
-
-      // ★ window 経由で取得
       const payload = window.collectFormData();
       const completedAt = new Date();
       const reservedDetails = Array.isArray(window.reservationSelections) ? window.reservationSelections : [];
       const completedAtJst = completedAt.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', hour12: false });
 
+      const resp = await fetch(window.WEB_APP_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'reserve',
+          ...payload,
+          reserved: true,
+          reserved_at: completedAt.toISOString(),
+          completed_at_iso: completedAt.toISOString(),
+          completed_at_jst: completedAtJst,
+          selected_agents: reservedDetails.map(r => r.agent_name).join(','),
+          reservation_count: reservedDetails.length,
+          reservation_details: reservedDetails
+        })
+      });
+
+      const text = await resp.text();
+      let json = {};
       try {
-        await fetch(window.WEB_APP_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({
-            action: 'reserve',
-            ...payload,
-            reserved: true,
-            reserved_at: completedAt.toISOString(),
-            completed_at_iso: completedAt.toISOString(),
-            completed_at_jst: completedAtJst,
-            selected_agents: reservedDetails.map(r => r.agent_name).join(','),
-            reservation_count: reservedDetails.length,
-            reservation_details: reservedDetails
-          })
-        });
-      } catch (e) {
-        console.error('sendToSheet error:', e);
+        json = JSON.parse(text || '{}');
+      } catch (_) {
+        json = {};
+      }
+
+      if (!resp.ok || !json.ok) {
+        throw new Error((json && json.error) || `status ${resp.status}`);
       }
     }
 
