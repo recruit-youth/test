@@ -351,6 +351,7 @@ function handleReserve_(payload) {
   data.completed_at_jst = Utilities.formatDate(completedAt, 'Asia/Tokyo', 'yyyy/MM/dd/ HH:mm');
   data.received_at_iso = now.toISOString();
 
+  migrateApplicantsHeadersToJapanese_(appSheet);
   var localizedData = localizeApplicantData_(data);
   appendObjectRowWithFirstHeader_(appSheet, localizedData, '完了時間');
 
@@ -822,7 +823,20 @@ function appendObjectRowWithFirstHeader_(sheet, obj, firstHeader) {
 }
 
 function localizeApplicantData_(obj) {
-  var map = {
+  var localized = {};
+  Object.keys(obj || {}).forEach(function(key) {
+    var label = toApplicantsLabel_(key);
+    localized[label] = obj[key];
+  });
+
+  if (!localized['完了時間']) {
+    localized['完了時間'] = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/MM/dd/ HH:mm');
+  }
+  return localized;
+}
+
+function getApplicantsLabelMap_() {
+  return {
     completed_at_jst: '完了時間',
     completed_at_iso: '完了時間ISO',
     received_at_iso: '受信時間ISO',
@@ -870,17 +884,47 @@ function localizeApplicantData_(obj) {
     desired_income_level: '希望年収水準',
     consult_request: 'キャリア相談希望'
   };
+}
 
-  var localized = {};
-  Object.keys(obj || {}).forEach(function(key) {
-    var label = map[key] || key;
-    localized[label] = obj[key];
+function toApplicantsLabel_(key) {
+  var raw = String(key || '').trim();
+  if (!raw) return '';
+
+  var map = getApplicantsLabelMap_();
+  if (map[raw]) return map[raw];
+
+  var normalized = normalizeHeader_(raw);
+  if (map[normalized]) return map[normalized];
+
+  return raw;
+}
+
+function migrateApplicantsHeadersToJapanese_(sheet) {
+  var lastRow = sheet.getLastRow();
+  var lastCol = sheet.getLastColumn();
+  if (lastRow < 1 || lastCol < 1) return;
+
+  var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0]
+    .map(function(v) { return String(v || '').trim(); });
+
+  var seen = {};
+  var converted = [];
+  headers.forEach(function(header) {
+    var label = toApplicantsLabel_(header);
+    if (!label) return;
+    if (seen[label]) return;
+    seen[label] = true;
+    converted.push(label);
   });
 
-  if (!localized['完了時間']) {
-    localized['完了時間'] = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/MM/dd/ HH:mm');
+  if (!converted.length) return;
+
+  if (converted[0] !== '完了時間') {
+    converted = converted.filter(function(h) { return h !== '完了時間'; });
+    converted.unshift('完了時間');
   }
-  return localized;
+
+  sheet.getRange(1, 1, 1, converted.length).setValues([converted]);
 }
 
 function toCellValue_(value) {
