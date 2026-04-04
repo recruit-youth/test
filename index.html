@@ -873,6 +873,10 @@
             <!-- STEP 1: 基本属性 -->
             <div class="step active" data-title="基本属性について教えてください（Q1〜Q4）">
               <div class="field">
+                <div class="field-label">名前<span class="req">必須</span></div>
+                <input type="text" name="name" placeholder="例）山田 太郎">
+              </div>
+              <div class="field">
                 <div class="field-label">Q1. 年齢<span class="req">必須</span></div>
                 <select name="age">
                   <option value="">選択してください</option>
@@ -1284,6 +1288,14 @@
                   <div class="pill" data-value="今は診断だけでよい">今は診断だけでよい</div>
                 </div>
                 <input type="hidden" name="consult_request">
+              </div>
+              <div class="field">
+                <div class="field-label">電話番号<span class="req">必須</span></div>
+                <input type="tel" name="tel" placeholder="例）08012345678">
+              </div>
+              <div class="field">
+                <div class="field-label">メールアドレス<span class="req">必須</span></div>
+                <input type="email" name="email" placeholder="例）example@mail.com">
               </div>
             </div>
 
@@ -1749,6 +1761,7 @@
               timeArea.classList.add('hidden');
               return;
             }
+            scrollToCenter(calWrap);
 
             clearConflictMessage();
             await loadAvailability();
@@ -1789,6 +1802,7 @@
 
             calendar.render();
             markBusyDays();
+            scrollToCenter(calWrap);
           });
         });
 
@@ -1888,7 +1902,7 @@
         } else {
           currentStep++;
           updateStep();
-          scrollToCenter(steps[currentStep]);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         }
       });
 
@@ -1984,6 +1998,7 @@
           reserved_at: completedAt.toISOString(),
           completed_at_iso: completedAt.toISOString(),
           completed_at_jst: completedAtJst,
+          answers_json: payload,
           selected_agents: reservedDetails.map(r => r.agent_name).join(','),
           reservation_count: reservedDetails.length,
           reservation_details: reservedDetails
