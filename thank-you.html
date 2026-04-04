@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>予約ありがとうございます | あなたの転職</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "YuGothic", "Yu Gothic", sans-serif;
+      background: radial-gradient(circle at top, #fef2f2 0, #f5f7fb 55%, #eef2ff 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 20px;
+      padding: 32px 24px;
+      max-width: 420px;
+      width: 90%;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, .15);
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 20px;
+      margin: 0 0 8px;
+    }
+
+    p {
+      font-size: 13px;
+      color: #6b7280;
+      margin: 0 0 12px;
+    }
+
+    .line-btn {
+      margin-top: 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 18px;
+      border-radius: 999px;
+      border: none;
+      background: #06c755;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+    }
+
+    .line-icon {
+      width: 20px;
+      height: 20px;
+      border-radius: 6px;
+      background: #fff;
+      color: #06c755;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 13px;
+    }
+
+    .next-btn {
+      margin-top: 10px;
+      display: inline-block;
+      padding: 10px 18px;
+      border-radius: 999px;
+      text-decoration: none;
+      border: 1px solid #e5e7eb;
+      font-size: 13px;
+      font-weight: 600;
+      color: #111827;
+    }
+
+    .small {
+      font-size: 11px;
+      color: #9ca3af;
+      margin-top: 8px;
+    }
+
+    #reserveResult + .page-bottom {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+  <section id="reserveResult" class="card" aria-live="polite">
+    <h1>ご予約ありがとうございます。</h1>
+    <p>担当より確認のご連絡をいたします。LINE登録で今後のご案内もスムーズです。</p>
+
+    <a class="line-btn" href="#" aria-label="LINEで友だち追加">
+      <span class="line-icon" aria-hidden="true">L</span>
+      LINEで友だち追加
+    </a>
+
+    <div>
+      <a class="next-btn" href="./interview-calendar.html">面談日程を選ぶ</a>
+    </div>
+
+    <p class="small">※ LINEリンクは本番URLに置き換えてください。</p>
+  </section>
+</body>
+</html>
