@@ -1,0 +1,1422 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>マッチするエージェント診断 | あなたの転職</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --surface: #ffffff;
+      --text: #111827;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+      --accent: #ef4444;
+      --accent-soft: #fee2e2;
+      --accent-grad-from: #ef4444;
+      --accent-grad-to: #fb923c;
+      --shadow: 0 18px 40px rgba(15, 23, 42, 0.219);
+      --radius-lg: 20px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "YuGothic", "Yu Gothic", sans-serif;
+      background: radial-gradient(circle at top, #fef2f2 0, #f5f7fb 55%, #eef2ff 100%);
+      color: var(--text);
+    }
+
+    .page {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px 40px;
+    }
+
+    header {
+      width: 100%;
+      max-width: 960px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 18px;
+      color: var(--text);
+    }
+
+    .logo-mark {
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--accent-grad-from), var(--accent-grad-to));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 16px;
+    }
+
+    .hero-tag {
+      padding: 4px 12px;
+      border-radius: 999px;
+      border: 1px solid #fecaca;
+      background: rgba(254, 242, 242, .9);
+      color: #b91c1c;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    main {
+      width: 100%;
+      max-width: 960px;
+      display: grid;
+      grid-template-columns: minmax(0, 3fr) minmax(0, 2.4fr);
+      gap: 24px;
+    }
+
+    @media (max-width:900px) {
+      main {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .card {
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow);
+      padding: 20px 20px 16px;
+    }
+
+    .left-copy h1 {
+      font-size: 24px;
+      line-height: 1.5;
+      margin: 0 0 8px;
+    }
+
+    .left-copy p {
+      margin: 0 0 16px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .badge-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .mini-badge {
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #f3f4ff;
+      color: #4338ca;
+      border: 1px solid #e5e7eb;
+    }
+
+    /* wizard */
+    .wizard-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .wizard-title {
+      font-weight: 600;
+      font-size: 14px;
+      letter-spacing: .04em;
+      color: var(--muted);
+    }
+
+    .wizard-q {
+      font-weight: 700;
+      font-size: 20px;
+    }
+
+    .progress-bar-wrap {
+      width: 100%;
+      height: 4px;
+      border-radius: 999px;
+      background: #f3f4f6;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--accent-grad-from), var(--accent-grad-to));
+      transition: width .25s;
+    }
+
+    form {
+      margin: 0;
+    }
+
+    .step {
+      display: none;
+      animation: fadeIn .18s ease-out;
+    }
+
+    .step.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(4px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .field {
+      margin-bottom: 16px;
+    }
+
+    .field-label {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .field-label span.req {
+      font-size: 10px;
+      color: #b91c1c;
+      background: #fee2e2;
+      border-radius: 999px;
+      padding: 2px 6px;
+    }
+
+    .field-help {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    input[type="text"],
+    input[type="email"],
+    input[type="tel"],
+    input[type="number"],
+    select {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      font-size: 13px;
+      outline: none;
+      transition: border-color .16s, box-shadow .16s, background .16s;
+      background: #f9fafb;
+    }
+
+    input:focus,
+    select:focus {
+      border-color: #fecaca;
+      box-shadow: 0 0 0 1px #fecaca;
+      background: #fff;
+    }
+
+    /* tap choices */
+    .pill-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    @media (max-width:600px) {
+      .pill-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    .pill {
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      padding: 10px 6px;
+      font-size: 12px;
+      text-align: center;
+      background: #fff;
+      cursor: pointer;
+      transition: background .16s, border-color .16s, box-shadow .16s, transform .08s;
+      user-select: none;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .pill.active {
+      background: linear-gradient(90deg, var(--accent-grad-from), var(--accent-grad-to));
+      border-color: transparent;
+      color: #fff;
+      box-shadow: 0 0 0 1px rgba(248, 113, 113, .1);
+      transform: translateY(-1px);
+    }
+
+    .footer-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 8px;
+      gap: 12px;
+    }
+
+    .btn {
+      border-radius: 999px;
+      padding: 10px 24px;
+      font-size: 13px;
+      font-weight: 600;
+      border: 1px solid transparent;
+      background: #fff;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      transition: background .16s, border-color .16s, transform .08s, box-shadow .16s;
+    }
+
+    .btn:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .btn-secondary {
+      border-color: var(--border);
+      color: var(--muted);
+      background: #f9fafb;
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: #f3f4f6;
+    }
+
+    .btn-primary {
+      background: linear-gradient(90deg, var(--accent-grad-from), var(--accent-grad-to));
+      color: #fff;
+      box-shadow: 0 10px 25px rgba(248, 113, 113, .3);
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 14px 30px rgba(248, 113, 113, .35);
+    }
+
+    .error-msg {
+      color: #b91c1c;
+      font-size: 11px;
+      margin-top: 4px;
+      min-height: 14px;
+    }
+
+    /* right card (benefits) */
+    .right-card-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .checklist {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 12px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .checklist li {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+
+    .check-icon {
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      background: #fee2e2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      color: #b91c1c;
+      flex-shrink: 0;
+    }
+
+    .right-foot {
+      font-size: 11px;
+      color: var(--muted);
+      border-top: 1px dashed #e5e7eb;
+      padding-top: 8px;
+      margin-top: 8px;
+    }
+
+    /* results */
+    #result-section {
+      margin-top: 12px;
+    }
+
+    #result-section.hidden {
+      display: none;
+    }
+
+    .result-title {
+      font-size: 17px;
+      font-weight: 700;
+      margin: 0 0 8px;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .result-sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin: 0 0 12px;
+    }
+
+    .agent-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    @media (max-width:900px) {
+      .agent-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .agent-card {
+      border-radius: 16px;
+      border: 1px solid #fee2e2;
+      background: #fff;
+      padding: 10px 10px 12px;
+    }
+
+    .agent-name {
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .agent-tag {
+      font-size: 11px;
+      color: #b91c1c;
+      background: #fee2e2;
+      padding: 2px 6px;
+      border-radius: 999px;
+      display: inline-block;
+      margin-bottom: 6px;
+    }
+
+    .agent-desc {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 8px;
+      min-height: 40px;
+    }
+
+    .agent-meta {
+      font-size: 10px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .mini-link-btn {
+      font-size: 11px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: none;
+      background: linear-gradient(90deg, var(--accent-grad-from), var(--accent-grad-to));
+      color: #fff;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+
+    .loading {
+      display: none;
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    .loading.active {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dot-loader {
+      display: inline-flex;
+      gap: 3px;
+    }
+
+    .dot-loader span {
+      width: 4px;
+      height: 4px;
+      border-radius: 999px;
+      background: #f97373;
+      animation: bounce 0.8s infinite alternate;
+    }
+
+    .dot-loader span:nth-child(2) {
+      animation-delay: .15s;
+    }
+
+    .dot-loader span:nth-child(3) {
+      animation-delay: .3s;
+    }
+
+    @keyframes bounce {
+      to {
+        transform: translateY(-3px);
+        opacity: .4;
+      }
+    }
+
+    .small-note {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    /* ★② 面談予約完了画面用（追加） */
+    #reserveResult {
+      max-width: 720px;
+      margin: 80px auto 0;
+      background: #fff;
+      border-radius: 20px;
+      padding: 32px 24px;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, .15);
+      text-align: center;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    #calendar-wrapper {
+      max-width: 900px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #fff;
+      border-radius: 12px;
+    }
+
+    /* ===== エージェント配下カレンダー ===== */
+    .agent-calendar {
+      margin-top: 10px;
+      padding: 10px;
+      border: 1px solid #f3f4f6;
+      border-radius: 16px;
+      max-width: 320px;
+      /* ← 少し小さく */
+      background: linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
+    }
+
+    /* 日付セル */
+    .agent-calendar .fc-daygrid-day-frame {
+      border-radius: 10px;
+      transition: background .15s, box-shadow .15s;
+    }
+
+    /* hover */
+    .agent-calendar .fc-daygrid-day:hover .fc-daygrid-day-frame {
+      background: #fff1f2;
+      box-shadow: inset 0 0 0 1px #fecaca;
+    }
+
+    /* クリック可能感 */
+    .agent-calendar .fc-daygrid-day {
+      cursor: pointer;
+    }
+
+    /* 数字 */
+    .agent-calendar .fc-daygrid-day-number {
+      font-size: 10px;
+      padding: 4px;
+      color: #374151;
+    }
+
+    .agent-calendar .fc-toolbar {
+      margin-bottom: 6px;
+    }
+
+    .agent-calendar .fc-toolbar-title {
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .agent-calendar .fc-button {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 999px;
+      padding: 2px 6px;
+      color: #6b7280;
+    }
+
+    .agent-calendar .fc-button:hover {
+      background: #fef2f2;
+      border-color: #fecaca;
+    }
+
+    .agent-calendar .fc-col-header-cell-cushion {
+      font-size: 9px;
+      color: #9ca3af;
+      font-weight: 500;
+    }
+
+    .time-area {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px dashed #e5e7eb;
+    }
+
+    .time-area select {
+      border-radius: 999px;
+      font-size: 12px;
+    }
+
+    .time-area button {
+      border-radius: 999px;
+      font-size: 12px;
+      background: linear-gradient(90deg, var(--accent-grad-from), var(--accent-grad-to));
+      color: #fff;
+    }
+
+    .agent-calendar .fc {
+      font-size: 11px;
+    }
+
+    .agent-calendar .fc-toolbar-title {
+      font-size: 12px;
+    }
+
+    .agent-calendar .fc-daygrid-day-number {
+      font-size: 10px;
+    }
+
+    .time-area {
+      margin-top: 6px;
+    }
+
+    .time-area select,
+    .time-area button {
+      width: 100%;
+      margin-top: 6px;
+      padding: 6px;
+      font-size: 12px;
+    }
+
+    /* 完了ボタン */
+    .btn-primary {
+      background-color: #2563eb;
+      /* 面談日程を選ぶと同じ色 */
+      color: #fff;
+      padding: 12px 32px;
+      border-radius: 6px;
+      border: none;
+      font-size: 16px;
+    }
+
+    .btn-primary.disabled {
+      background-color: #9ca3af;
+      /* 灰色 */
+      cursor: not-allowed;
+    }
+
+    .page-bottom {
+      width: 100%;
+      max-width: 960px;
+      margin: 40px auto 0;
+      padding: 24px 16px;
+      display: flex;
+      justify-content: center;
+    }
+
+    /* ==== 今日（fc-day-today）の色付けを無効化 ==== */
+    .agent-calendar .fc-day-today {
+      background: transparent !important;
+    }
+
+    .agent-calendar .fc-day-today .fc-daygrid-day-frame {
+      background: transparent !important;
+      box-shadow: none !important;
+    }
+
+    /* ==== クリックされた日付のハイライト（選択日） ==== */
+    .agent-calendar .fc-daygrid-day.is-selected .fc-daygrid-day-frame {
+      background: #fee2e2;
+      /* 薄い赤 */
+      box-shadow: inset 0 0 0 2px #ef4444;
+    }
+
+    .agent-calendar .fc-daygrid-day.is-selected .fc-daygrid-day-number {
+      color: #b91c1c;
+      font-weight: 700;
+    }
+
+    .reserve-status {
+      font-size: 11px;
+      color: #6b7280;
+      background: #f3f4f6;
+      border: 1px solid #e5e7eb;
+      padding: 4px 8px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+
+    /* テキストが空なら箱ごと非表示 */
+    .reserve-status:empty {
+      display: none;
+    }
+
+    /* 結果ページのフッター：左=戻る / 中央=完了 / 右=ダミーで中央固定 */
+    .result-footer {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      /* 左の領域 / 中央 / 右の領域 */
+      align-items: center;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .result-footer #backToWizardBtnBottom {
+      justify-self: start;
+    }
+
+    .result-footer #completeBtn {
+      justify-self: center;
+    }
+
+    .result-footer-spacer {
+      justify-self: end;
+    }
+
+    /* 完了ボタン（有効時＝いまのグラデのまま使う） */
+    #completeBtn.btn-primary {
+      background: linear-gradient(90deg, var(--accent-grad-from), var(--accent-grad-to));
+      color: #fff;
+      border: none;
+    }
+
+    /* 完了ボタン（無効時＝灰色で固定） */
+    #completeBtn:disabled {
+      background: #9ca3af !important;
+      color: #fff !important;
+      cursor: not-allowed !important;
+      box-shadow: none !important;
+      opacity: 1 !important;
+      /* 透明にしたくないなら */
+      transform: none !important;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div class="logo">
+      </div>
+      <div class="hero-tag">20代専門・完全無料のエージェント診断</div>
+    </header>
+
+    <main>
+      <div id="wizardArea">
+        <!-- 左：診断フォーム -->
+        <section class="card">
+          <div class="left-copy">
+            <h1>あなたにマッチする<br>転職エージェントを3社だけご提案します。</h1>
+            <p>カンタンな質問に答えるだけで、20代向けに強いエージェントの中から、<br>あなたの希望条件に合う3社と日程予約リンクを自動表示します。</p>
+            <div class="badge-list">
+              <span class="mini-badge">20代専任アドバイザー在籍</span>
+              <span class="mini-badge">最短1分で診断完了</span>
+              <span class="mini-badge">完全無料・オンライン面談OK</span>
+            </div>
+          </div>
+
+          <div class="wizard-header">
+            <div>
+              <div class="wizard-title">STEP <span id="step-no">1</span> / <span id="step-total">5</span></div>
+              <div class="wizard-q" id="question-title">まずは基本情報を教えてください</div>
+            </div>
+            <div style="font-size:11px;color:var(--muted);">所要時間：約1分</div>
+          </div>
+          <div class="progress-bar-wrap">
+            <div class="progress-bar" id="progress-bar"></div>
+          </div>
+
+          <form id="diagnosis-form" novalidate>
+            <!-- STEP 1: 基本情報 -->
+            <div class="step active" data-title="まずは基本情報を教えてください">
+              <div class="field">
+                <div class="field-label">氏名<span class="req">必須</span></div>
+                <input type="text" name="name" placeholder="例）山田 太郎">
+              </div>
+              <div class="field">
+                <div class="field-label">性別<span class="req">必須</span></div>
+                <div class="pill-grid" data-name="gender">
+                  <div class="pill" data-value="男性">男性</div>
+                  <div class="pill" data-value="女性">女性</div>
+                  <div class="pill" data-value="回答しない">回答しない</div>
+                </div>
+                <input type="hidden" name="gender">
+              </div>
+              <div class="field">
+                <div class="field-label">年齢<span class="req">必須</span></div>
+                <input type="number" name="age" min="18" max="39" placeholder="例）26">
+                <div class="field-help">20〜30代前半の方を主な対象としています。</div>
+              </div>
+            </div>
+
+            <!-- STEP 2: 居住地・希望勤務地 -->
+            <div class="step" data-title="お住まい・希望エリアを教えてください">
+              <div class="field">
+                <div class="field-label">現在お住まいの都道府県<span class="req">必須</span></div>
+                <div class="pill-grid" data-name="living_pref">
+                  <div class="pill" data-value="東京都">東京都</div>
+                  <div class="pill" data-value="神奈川県">神奈川県</div>
+                  <div class="pill" data-value="千葉県">千葉県</div>
+                  <div class="pill" data-value="埼玉県">埼玉県</div>
+                  <div class="pill" data-value="大阪府">大阪府</div>
+                  <div class="pill" data-value="愛知県">愛知県</div>
+                  <div class="pill" data-value="福岡県">福岡県</div>
+                  <div class="pill" data-value="北海道">北海道</div>
+                  <div class="pill" data-value="その他">その他</div>
+                </div>
+                <input type="hidden" name="living_pref">
+              </div>
+              <div class="field">
+                <div class="field-label">希望勤務地（複数選択可）<span class="req">必須</span></div>
+                <div class="pill-grid" data-name="desired_area" data-multi="true">
+                  <div class="pill" data-value="首都圏">首都圏</div>
+                  <div class="pill" data-value="関西">関西</div>
+                  <div class="pill" data-value="東海">東海</div>
+                  <div class="pill" data-value="九州">九州</div>
+                  <div class="pill" data-value="北海道・東北">北海道・東北</div>
+                  <div class="pill" data-value="中国・四国">中国・四国</div>
+                  <div class="pill" data-value="全国どこでも">全国どこでも</div>
+                  <div class="pill" data-value="リモート中心">リモート中心</div>
+                </div>
+                <input type="hidden" name="desired_area">
+                <div class="field-help">当てはまるエリアを選択してください。</div>
+              </div>
+            </div>
+
+            <!-- STEP 3: 経験職種・希望職種 -->
+            <div class="step" data-title="ご経験と希望職種について教えてください">
+              <div class="field">
+                <div class="field-label">経験職種（メイン）<span class="req">必須</span></div>
+                <div class="pill-grid" data-name="exp_job">
+                  <div class="pill" data-value="営業">営業</div>
+                  <div class="pill" data-value="事務・アシスタント">事務・アシスタント</div>
+                  <div class="pill" data-value="販売・サービス">販売・サービス</div>
+                  <div class="pill" data-value="エンジニア（IT）">エンジニア（IT）</div>
+                  <div class="pill" data-value="施工管理">施工管理</div>
+                  <div class="pill" data-value="その他">その他</div>
+                </div>
+                <input type="hidden" name="exp_job">
+              </div>
+              <div class="field">
+                <div class="field-label">希望職種<span class="req">必須</span></div>
+                <div class="pill-grid" data-name="desired_job">
+                  <div class="pill" data-value="営業">営業</div>
+                  <div class="pill" data-value="事務・アシスタント">事務・アシスタント</div>
+                  <div class="pill" data-value="販売・サービス">販売・サービス</div>
+                  <div class="pill" data-value="エンジニア（IT）">エンジニア（IT）</div>
+                  <div class="pill" data-value="施工管理">施工管理</div>
+                  <div class="pill" data-value="未定・相談したい">未定・相談したい</div>
+                </div>
+                <input type="hidden" name="desired_job">
+              </div>
+              <div class="field">
+                <div class="field-label">希望職種のご経験<span class="req">必須</span></div>
+                <div class="pill-grid" data-name="desired_job_exp">
+                  <div class="pill" data-value="経験あり">経験あり</div>
+                  <div class="pill" data-value="未経験でも挑戦したい">未経験でも挑戦したい</div>
+                </div>
+                <input type="hidden" name="desired_job_exp">
+              </div>
+            </div>
+
+            <!-- STEP 4: 年収・条件 -->
+            <div class="step" data-title="年収や転職条件について教えてください">
+              <div class="field">
+                <div class="field-label">現年収（おおよそ）<span class="req">必須</span></div>
+                <input type="number" name="current_income" placeholder="例）350（万円）">
+              </div>
+              <div class="field">
+                <div class="field-label">希望年収<span class="req">必須</span></div>
+                <input type="number" name="desired_income" placeholder="例）420（万円）">
+              </div>
+              <div class="field">
+                <div class="field-label">転職希望時期<span class="req">必須</span></div>
+                <div class="pill-grid" data-name="when_change">
+                  <div class="pill" data-value="できるだけ早く">できるだけ早く</div>
+                  <div class="pill" data-value="3ヶ月以内">3ヶ月以内</div>
+                  <div class="pill" data-value="よい求人があれば">よい求人があれば</div>
+                </div>
+                <input type="hidden" name="when_change">
+              </div>
+            </div>
+
+            <!-- STEP 5: 連絡先 -->
+            <div class="step" data-title="面談調整に使うご連絡先を教えてください">
+              <div class="field">
+                <div class="field-label">電話番号<span class="req">必須</span></div>
+                <input type="tel" name="tel" placeholder="例）08012345678">
+                <div class="field-help">日程確定のご連絡のみに使用します。</div>
+              </div>
+              <div class="field">
+                <div class="field-label">メールアドレス<span class="req">必須</span></div>
+                <input type="email" name="email" placeholder="例）example@mail.com">
+              </div>
+              <div class="field">
+                <div class="field-label">連絡がつきやすい時間帯<span class="req">必須</span></div>
+                <div class="pill-grid" data-name="contact_time">
+                  <div class="pill" data-value="午前中">午前中</div>
+                  <div class="pill" data-value="12〜15時">12〜15時</div>
+                  <div class="pill" data-value="15〜18時">15〜18時</div>
+                  <div class="pill" data-value="18時以降">18時以降</div>
+                </div>
+                <input type="hidden" name="contact_time">
+              </div>
+            </div>
+
+            <div class="error-msg" id="error-msg"></div>
+
+            <div class="footer-nav">
+              <button type="button" class="btn btn-secondary" id="btn-prev">戻る</button>
+              <div style="flex:1"></div>
+              <button type="button" class="btn btn-primary" id="btn-next">次へ</button>
+            </div>
+
+            <div class="loading" id="loading">
+              <div class="dot-loader">
+                <span></span><span></span><span></span>
+              </div>
+              <span>診断結果を作成中です…</span>
+            </div>
+            <div class="small-note">※送信いただいた個人情報は、提携エージェントからのご連絡およびサービス案内の目的のみに使用します。</div>
+          </form>
+
+          <!-- プルダウンを表示 -->
+          <div id="timeArea" style="display:none; margin-top:16px;">
+            <label>面談時間</label>
+            <select id="timeSelect">
+              <option value="" disabled selected>
+                面談時間を選択してください
+              </option>
+            </select>
+          </div>
+
+
+        </section>
+      </div>
+      <!-- 結果表示 -->
+      <section id="result-section" class="hidden card" style="grid-column: 1 / -1;">
+        <h2 class="result-title">あなたにマッチしたエージェントはこちらの3社です。</h2>
+        <p class="result-sub">各社の特徴を確認して、気になるエージェントの日程を選択して予約してください。</p>
+        <div class="agent-grid" id="agent-grid"></div>
+
+        <div class="footer-nav result-footer">
+          <button type="button" class="btn btn-secondary" id="backToWizardBtnBottom">戻る</button>
+          <button id="completeBtn" class="btn-primary disabled" disabled>
+            完了
+          </button>
+
+          <!-- 右側の空き（中央寄せ維持用） -->
+          <div class="result-footer-spacer" aria-hidden="true"></div>
+        </div>
+      </section>
+    </main>
+
+    <section id="reserveResult" class="hidden">
+      <h1>面談予約を受け付けました。</h1>
+      <p>
+        ご入力いただいた連絡先宛に、エージェント担当者より
+        日程確定のご連絡を差し上げます。
+      </p>
+      <p>
+        面談当日までのご質問や、職務経歴書の添削希望などがあれば、<br>
+        公式LINEからお気軽にご相談ください。
+      </p>
+
+      <a href="https://lin.ee/XXXXXXX" target="_blank" class="line-btn">
+        <span class="line-icon">LINE</span>
+        公式LINEはこちら
+      </a>
+
+      <div class="small-note">
+        ※LINEを通してのご相談は無料です。
+      </div>
+    </section>
+  </div>
+  <script>
+    let hasAnyReservation = false;
+    const completeBtn = document.getElementById("completeBtn");
+    let confirmedDateObj = null; // ★追加（Date型）
+    (function () {
+      const steps = Array.from(document.querySelectorAll('.step'));
+      const stepTotalEl = document.getElementById('step-total');
+      const stepNoEl = document.getElementById('step-no');
+      const qTitleEl = document.getElementById('question-title');
+      const progressBar = document.getElementById('progress-bar');
+      const errorEl = document.getElementById('error-msg');
+      const btnPrev = document.getElementById('btn-prev');
+      const btnNext = document.getElementById('btn-next');
+      const loadingEl = document.getElementById('loading');
+      const resultSection = document.getElementById('result-section');
+      const agentGrid = document.getElementById('agent-grid');
+      const form = document.getElementById('diagnosis-form');
+
+      // ★ここを「ウェブアプリとしてデプロイした /exec のURL」に差し替える
+      const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwnnvJBreLRaZTnUG4TPPPQLn_Z6Gz6eEjmBpCUkTwrSrpnDVfwPkiwebp06MDXqXvcHQ/exec';
+      window.WEB_APP_URL = WEB_APP_URL;
+
+      let currentStep = 0;
+      const totalSteps = steps.length;
+      stepTotalEl.textContent = totalSteps;
+
+      function updateStep() {
+        steps.forEach((s, i) => s.classList.toggle('active', i === currentStep));
+        stepNoEl.textContent = currentStep + 1;
+        qTitleEl.textContent = steps[currentStep].dataset.title || '';
+        progressBar.style.width = ((currentStep + 1) / totalSteps * 100) + '%';
+        btnPrev.disabled = currentStep === 0;
+        btnNext.textContent = currentStep === totalSteps - 1 ? '診断結果を見る' : '次へ';
+        errorEl.textContent = '';
+      }
+
+      function getRequiredNamesForStep(stepEl) {
+        const names = [];
+        Array.from(stepEl.querySelectorAll('input[name]')).forEach(inp => {
+          names.push(inp.name);
+        });
+        return Array.from(new Set(names));
+      }
+
+      function validateStep() {
+        const stepEl = steps[currentStep];
+        const requiredNames = getRequiredNamesForStep(stepEl);
+        for (const name of requiredNames) {
+          const el = form.querySelector('[name="' + name + '"]');
+          if (!el) continue;
+          const value = (el.value || '').trim();
+          if (!value) {
+            errorEl.textContent = '未入力の項目があります。選択・入力をお願いいたします。';
+            return false;
+          }
+        }
+        errorEl.textContent = '';
+        return true;
+      }
+
+      function collectFormData() {
+        const data = {};
+        const formData = new FormData(form);
+        formData.forEach((v, k) => { data[k] = v; });
+        return data;
+      }
+      window.collectFormData = collectFormData;
+
+      function showLoading(show) {
+        loadingEl.classList.toggle('active', show);
+        btnNext.disabled = show;
+        btnPrev.disabled = show || currentStep === 0;
+      }
+      let selectedAgent = null;   // 今選択中のエージェント
+      let isCalendarOpen = false; // カレンダー表示中かどうか
+      function renderAgents(agents) {
+
+        agentGrid.innerHTML = '';
+
+        agents.forEach((agent, idx) => {
+          const div = document.createElement('div');
+          div.className = 'agent-card';
+
+          div.innerHTML = `
+  <div class="agent-tag">${agent.category || '20代向け特化'}</div>
+  <div class="agent-name">${agent.name}</div>
+  <div class="agent-desc">${agent.description || ''}</div>
+
+  <!-- ★ なぜこの会社？ -->
+  <div class="agent-meta">
+    ${(agent.reasons || []).map(r => `・${r}`).join('<br>')}
+  </div>
+
+  <div class="reserve-row" style="display:flex; align-items:center; gap:8px;">
+    <button type="button" class="mini-link-btn">面談日程を選ぶ</button>
+    <span class="reserve-status" aria-live="polite"></span>
+  </div>
+
+  <div class="agent-calendar hidden">
+    <div id="calendar-${idx}"></div>
+    <div class="time-area hidden">
+      <select>
+        <option value="">時間を選択</option>
+      </select>
+    </div>
+  </div>
+`;
+
+          agentGrid.appendChild(div);
+
+          const openBtn = div.querySelector('.mini-link-btn');
+          const statusEl = div.querySelector('.reserve-status');
+          const calWrap = div.querySelector('.agent-calendar');
+          const calEl = div.querySelector(`#calendar-${idx}`);
+          const timeArea = div.querySelector('.time-area');
+          const timeSelect = timeArea.querySelector('select');
+
+          let calendar;
+          let selectedDate = null;
+          // この会社の「確定済み（時間まで選択済み）」の表示用データ
+          let confirmedDateStr = null; // 'YYYY-MM-DD'
+          let confirmedTimeStr = null; // '10:00～11:00' など
+
+          // 曜日表示用
+          const DOW = ['日', '月', '火', '水', '木', '金', '土'];
+
+          function formatJPDateWithDowFromDate(d) {
+            if (!d) return '';
+            const m = d.getMonth() + 1;
+            const day = d.getDate();
+            const dow = DOW[d.getDay()];
+            return `${m}月${day}日（${dow}）`;
+          }
+
+          // timeSelect change は一度だけ登録（重複防止）
+          timeSelect.addEventListener('change', () => {
+            if (!timeSelect.value) return;
+
+            confirmedTimeStr = String(timeSelect.value).replace(/\s*〇\s*$/, '');
+
+            statusEl.textContent =
+              `${formatJPDateWithDowFromDate(confirmedDateObj)} ${confirmedTimeStr} を選択中`;
+
+            hasAnyReservation = true;
+            completeBtn.disabled = false;
+            completeBtn.classList.remove("disabled");
+
+            calWrap.classList.add('hidden');
+            timeArea.classList.add('hidden');
+
+            timeSelect.innerHTML = `
+    <option value="" disabled selected>
+      面談時間を選択してください
+    </option>
+  `;
+          });
+
+          openBtn.addEventListener('click', () => {
+
+
+
+            // 他のエージェントのカレンダーを閉じる
+            document.querySelectorAll('.agent-calendar').forEach(el => {
+              if (el !== calWrap) {
+                el.classList.add('hidden');
+              }
+            });
+
+            // 時間選択をリセット
+            timeArea.classList.add('hidden');
+            timeSelect.innerHTML = `
+             <option value="" disabled selected>
+                面談時間を選択してください
+              </option>
+                `;
+
+            // このエージェントのカレンダーを開閉
+            const isHidden = calWrap.classList.contains('hidden');
+            calWrap.classList.toggle('hidden', !isHidden);
+
+
+            if (!isHidden) {
+              timeArea.classList.add('hidden');
+            }
+
+            // すでに生成済みなら終了
+            if (!calendar) {
+              calendar = new FullCalendar.Calendar(calEl, {
+                initialView: 'dayGridMonth',
+                locale: 'ja',
+                height: 'auto',
+
+                // ★ これを追加（todayボタンを出さない）
+                headerToolbar: {
+                  left: 'prev,next',
+                  center: 'title',
+                  right: ''   // today を置かない
+                },
+
+                dateClick: (info) => {
+                  // ==== クリックされた日付を色付け（選択状態） ====
+                  // いったんこのカレンダー内の選択状態を全部解除
+                  calEl.querySelectorAll('.fc-daygrid-day.is-selected').forEach(el => {
+                    el.classList.remove('is-selected');
+                  });
+
+                  // クリックしたセルに選択状態を付与
+                  info.dayEl.classList.add('is-selected');
+
+                  confirmedDateStr = info.dateStr;  // 文字列も必要なら残す
+                  confirmedDateObj = info.date;     // ★これが本命
+
+                  // （任意）選択した日付を保持したいなら
+                  selectedDate = info.dateStr;
+
+                  // ==== 既存処理（時間選択を表示） ====
+                  timeArea.classList.remove('hidden');
+                  timeSelect.innerHTML = `
+                  <option value="" disabled selected>
+                   面談時間を選択してください
+                     </option>
+                      `;
+
+                  ["10:00～11:00", "11:00～12:00", "12:00～13:00", "13:00～14:00", "14:00～15:00", "15:00～16:00", "16:00～17:00", "17:00～18:00"]
+                    .forEach(t => {
+                      const opt = document.createElement('option');
+                      opt.textContent = `${t} 〇`;
+                      timeSelect.appendChild(opt);
+                    });
+                }
+              });
+            }
+
+            // ★重要：開くたびに必ず render
+            calendar.render();
+          });
+
+        });
+
+        function completeReservation() {
+          hasAnyReservation = true;
+          updateCompleteButton();
+        }
+
+        function updateCompleteButton() {
+          if (hasAnyReservation) {
+            completeBtn.disabled = false;
+            completeBtn.classList.remove("disabled");
+          }
+        }
+
+        // ✅ 結果ページ表示（前の画面を隠す）
+        const wizardArea = document.getElementById('wizardArea');
+        if (wizardArea) wizardArea.classList.add('hidden');
+
+        resultSection.classList.remove('hidden');
+        // 結果ページ表示のたびに「完了」を初期化（灰色）
+        hasAnyReservation = false;
+        completeBtn.disabled = true;
+        completeBtn.classList.add("disabled");
+        resultSection.scrollIntoView({ behavior: 'smooth' });
+      }
+
+      async function submitForm() {
+        const payload = collectFormData();
+        showLoading(true);
+        resultSection.classList.add('hidden');
+
+        try {
+          const params = new URLSearchParams(payload).toString();
+          const resp = await fetch(WEB_APP_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+              action: 'diagnose',
+              ...payload
+            })
+          });
+
+          const text = await resp.text();
+          console.log('GAS response:', resp.status, text);
+
+          if (!resp.ok) {
+            throw new Error('status ' + resp.status);
+          }
+
+          let json;
+          try {
+            json = JSON.parse(text);
+          } catch (parseErr) {
+            console.error('JSON parse error:', parseErr);
+            throw parseErr;
+          }
+
+          const agents = (json && json.agents && json.agents.length) ? json.agents : [];
+          if (!agents.length) {
+            // 念のためフロント側でもダミーを用意
+            renderAgents([
+              {
+                name: '20代特化エージェントA',
+                category: 'はじめての転職向け',
+                description: '書類添削・面接対策までマンツーマンでサポート。未経験職種へのチャレンジ実績も多数あります。',
+                area: '首都圏',
+                strength: '営業・事務',
+                calendarUrl: '#'
+              },
+              {
+                name: 'キャリアチェンジ支援エージェントB',
+                category: '未経験チャレンジ',
+                description: '販売・サービスからのキャリアチェンジ、IT業界への転身サポートを得意としています。',
+                area: '関西・東海',
+                strength: 'IT・第二新卒',
+                calendarUrl: '#'
+              },
+              {
+                name: '年収アップ支援エージェントC',
+                category: '年収UP重視',
+                description: '同職種での年収アップ・条件交渉に強みを持つエージェントです。',
+                area: '全国（オンライン）',
+                strength: '営業・施工管理',
+                calendarUrl: '#'
+              }
+            ]);
+          } else {
+            renderAgents(agents.slice(0, 3));
+          }
+        } catch (e) {
+          console.error('submitForm error:', e);
+          errorEl.textContent = '通信エラーが発生しました。時間をおいて再度お試しください。';
+        } finally {
+          showLoading(false);
+        }
+      }
+
+      btnPrev.addEventListener('click', () => {
+        if (currentStep === 0) return;
+        currentStep--;
+        updateStep();
+      });
+
+      btnNext.addEventListener('click', () => {
+        if (!validateStep()) return;
+        if (currentStep === totalSteps - 1) {
+          submitForm();
+        } else {
+          currentStep++;
+          updateStep();
+        }
+      });
+
+      // pill click handling (single / multi)
+      document.querySelectorAll('.pill-grid').forEach(grid => {
+        const name = grid.dataset.name;
+        const multi = grid.dataset.multi === 'true';
+        const hiddenInput = form.querySelector('input[name="' + name + '"]');
+        grid.addEventListener('click', e => {
+          const pill = e.target.closest('.pill');
+          if (!pill) return;
+          const value = pill.dataset.value;
+          if (multi) {
+            pill.classList.toggle('active');
+            const selected = Array.from(grid.querySelectorAll('.pill.active')).map(p => p.dataset.value);
+            hiddenInput.value = selected.join(',');
+          } else {
+            grid.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+            pill.classList.add('active');
+            hiddenInput.value = value;
+          }
+        });
+      });
+
+      updateStep();
+
+      // ★結果ページ → 診断フォームへ戻る
+      const backBtn = document.getElementById('backToWizardBtnBottom');
+      backBtn?.addEventListener('click', () => {
+        const wizardArea = document.getElementById('wizardArea');
+        if (wizardArea) wizardArea.classList.remove('hidden');
+
+        resultSection.classList.add('hidden');
+
+        document.querySelectorAll('.agent-calendar').forEach(el => el.classList.add('hidden'));
+        document.querySelectorAll('.time-area').forEach(el => el.classList.add('hidden'));
+
+        // ★「選択中」表示を全消し
+        document.querySelectorAll('.reserve-status').forEach(el => el.textContent = '');
+
+        // ★完了を灰色へ
+        hasAnyReservation = false;
+        completeBtn.disabled = true;
+
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+
+
+    })();
+
+    completeBtn.addEventListener('click', async () => {
+
+      // ★ ここで送客シートに送信
+      await sendToSheet();
+
+      // 診断・結果を非表示
+      document.querySelector('main').classList.add('hidden');
+
+
+      // 面談予約完了画面を表示
+      const reserveResult = document.getElementById('reserveResult');
+      reserveResult.classList.remove('hidden');
+
+      // 画面上部へスクロール
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    async function sendToSheet() {
+
+      // ★ window 経由で取得
+      const payload = window.collectFormData();
+
+      try {
+        await fetch(window.WEB_APP_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'reserve',
+            ...payload,
+            reserved: true,
+            reserved_at: new Date().toISOString()
+          })
+        });
+      } catch (e) {
+        console.error('sendToSheet error:', e);
+      }
+    }
+
+  </script>
+
+</body>
+</html>
