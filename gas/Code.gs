@@ -49,7 +49,8 @@ function jsonOutput_(obj) {
 }
 
 function handleDiagnose_(payload) {
-  const agents = loadAgents_();
+  const ctx = loadAgents_();
+  const agents = ctx.agents;
   if (!agents.length) {
     return { ok: true, agents: [] };
   }
@@ -59,13 +60,22 @@ function handleDiagnose_(payload) {
       const scoreResult = scoreAgent_(agent, payload);
       agent._score = scoreResult.score;
       agent._reasons = scoreResult.reasons;
+      agent._locationMatched = scoreResult.locationMatched;
+      agent._occupationMatched = scoreResult.occupationMatched;
       return agent;
     })
     .sort((a, b) => b._score - a._score);
 
+  const selected = pickBalancedAgents_(
+    scored,
+    Math.min(DEFAULT_TOP_AGENT_COUNT, scored.length)
+  );
+
+  incrementDisplayCounts_(ctx.sheet, ctx.rawHeaders, selected);
+
   return {
     ok: true,
-    agents: scored.slice(0, DEFAULT_TOP_AGENT_COUNT).map(agent => ({
+    agents: selected.map(agent => ({
       name: pickString_(agent, ['name', 'agent', 'agent_name', '会社名', 'エージェント名'], 'おすすめエージェント'),
       category: pickString_(agent, ['category', 'カテゴリ', 'tag', 'タグ'], '20代向け特化'),
       description: pickString_(agent, ['description', 'desc', '説明', '特徴'], ''),
@@ -80,7 +90,13 @@ function handleDiagnose_(payload) {
 function loadAgents_() {
   const sheet = getSheet_(AGENTS_SHEET_NAME);
   const values = sheet.getDataRange().getValues();
-  if (values.length <= 1) return [];
+  if (values.length <= 1) {
+    return {
+      sheet: sheet,
+      rawHeaders: [],
+      agents: []
+    };
+  }
 
   const rawHeaders = values[0].map(v => String(v || '').trim());
   const normalizedHeaders = rawHeaders.map(normalizeHeader_);
@@ -97,11 +113,21 @@ function loadAgents_() {
       item[key] = row[j];
       if (raw && item[raw] === undefined) item[raw] = row[j];
     }
+    item._rowNumber = i + 1;
+    item._displayCount = parseInt(
+      pickString_(item, ['display_count', '表示回数', '配信回数', '表示数'], '0'),
+      10
+    );
+    if (isNaN(item._displayCount)) item._displayCount = 0;
 
     if (isAgentEnabled_(item)) rows.push(item);
   }
 
-  return rows;
+  return {
+    sheet: sheet,
+    rawHeaders: rawHeaders,
+    agents: rows
+  };
 }
 
 function isAgentEnabled_(agent) {
@@ -130,46 +156,138 @@ function scoreAgent_(agent, payload) {
   const industries = pickMulti_(agent, ['industries', 'target_industries', '業界', '得意業界']);
   const timing = pickMulti_(agent, ['timing', 'target_timing', '転職時期']);
 
-  if (matchAny_(regions, [region])) {
+  let locationMatched = false;
+  if (prefecture && matchAny_(prefectures, [prefecture])) {
+    score += 55;
+    locationMatched = true;
+    reasons.push('居住都道府県に対応');
+  } else if (region && matchAny_(regions, [region])) {
+    score += 45;
+    locationMatched = true;
+    reasons.push('居住エリアに対応');
+  } else if (hasWideCoverage_(prefectures) || hasWideCoverage_(regions)) {
     score += 20;
-    reasons.push('居住エリアとの相性が良い');
+    locationMatched = true;
+    reasons.push('全国・広域対応');
   }
-  if (matchAny_(prefectures, [prefecture])) {
-    score += 20;
-    reasons.push('都道府県条件に対応');
+
+  const jobCandidates = [recentJob].concat(interestJobs).filter(v => v);
+  const jobMatched = !!jobCandidates.length && (
+    matchAny_(jobs, jobCandidates) || hasWideCoverage_(jobs)
+  );
+  const industryMatched = !!interestIndustries.length && (
+    matchAny_(industries, interestIndustries) || hasWideCoverage_(industries)
+  );
+  const occupationMatched = jobMatched || industryMatched;
+
+  if (jobMatched) {
+    score += 45;
+    reasons.push('希望・経験職種に強み');
   }
-  if (matchAny_(jobs, [recentJob].concat(interestJobs))) {
-    score += 25;
-    reasons.push('経験職種・興味職種に強みあり');
+  if (industryMatched) {
+    score += 35;
+    reasons.push('興味業界とマッチ');
   }
-  if (matchAny_(industries, interestIndustries)) {
-    score += 20;
-    reasons.push('希望業界にマッチ');
+  if (jobMatched && industryMatched) {
+    score += 10;
   }
   if (matchAny_(timing, [whenChange])) {
-    score += 8;
+    score += 5;
     reasons.push('転職希望時期と合致');
   }
 
   const supportsUnexp = pickString_(agent, ['supports_unexperienced', '未経験対応', '未経験可'], '');
   if (challenge.indexOf('挑戦') >= 0 && String(supportsUnexp).trim()) {
-    score += 8;
+    score += 4;
     reasons.push('未経験チャレンジ支援あり');
   }
 
   const minAge = parseInt(pickString_(agent, ['min_age', 'minage', '最低年齢'], ''), 10);
   const maxAge = parseInt(pickString_(agent, ['max_age', 'maxage', '最高年齢'], ''), 10);
   if (!isNaN(age) && !isNaN(minAge) && !isNaN(maxAge) && age >= minAge && age <= maxAge) {
-    score += 6;
+    score += 3;
     reasons.push('年齢ターゲットに適合');
   }
+
+  // 表示回数が少ないエージェントを優先して、提案の偏りを抑える。
+  const displayCount = parseInt(agent._displayCount || 0, 10);
+  const balanceBonus = Math.max(0, 20 - Math.min(isNaN(displayCount) ? 0 : displayCount, 20));
+  score += balanceBonus * 0.25;
 
   const description = pickString_(agent, ['description', 'desc', '説明', '特徴'], '');
   if (!reasons.length && description) {
     reasons.push(description);
   }
 
-  return { score: score, reasons: reasons };
+  return {
+    score: score,
+    reasons: reasons,
+    locationMatched: locationMatched,
+    occupationMatched: occupationMatched
+  };
+}
+
+function pickBalancedAgents_(agents, count) {
+  if (count <= 0) return [];
+  if (agents.length <= count) return agents.slice(0, count);
+
+  const tiers = [[], [], [], []];
+  agents.forEach(agent => {
+    const inLocation = !!agent._locationMatched;
+    const inOccupation = !!agent._occupationMatched;
+    const tier = inLocation && inOccupation
+      ? 0
+      : inLocation
+        ? 1
+        : inOccupation
+          ? 2
+          : 3;
+    tiers[tier].push(agent);
+  });
+
+  tiers.forEach(list => {
+    list.sort((a, b) => {
+      const aCount = parseInt(a._displayCount || 0, 10);
+      const bCount = parseInt(b._displayCount || 0, 10);
+      const countDiff = (isNaN(aCount) ? 0 : aCount) - (isNaN(bCount) ? 0 : bCount);
+      if (countDiff !== 0) return countDiff;
+
+      const scoreDiff = (b._score || 0) - (a._score || 0);
+      if (scoreDiff !== 0) return scoreDiff;
+
+      return (a._rowNumber || 0) - (b._rowNumber || 0);
+    });
+  });
+
+  const picked = [];
+  for (let tierIdx = 0; tierIdx < tiers.length; tierIdx += 1) {
+    const tier = tiers[tierIdx];
+    for (let i = 0; i < tier.length; i += 1) {
+      picked.push(tier[i]);
+      if (picked.length >= count) return picked;
+    }
+  }
+
+  return picked.slice(0, count);
+}
+
+function incrementDisplayCounts_(sheet, rawHeaders, selectedAgents) {
+  if (!selectedAgents.length) return;
+
+  let headerIndex = findHeaderIndex_(rawHeaders, ['display_count', '表示回数', '配信回数', '表示数']);
+  if (headerIndex < 0) {
+    rawHeaders.push('display_count');
+    headerIndex = rawHeaders.length - 1;
+    sheet.getRange(1, 1, 1, rawHeaders.length).setValues([rawHeaders]);
+  }
+
+  const columnNumber = headerIndex + 1;
+  selectedAgents.forEach(agent => {
+    const current = parseInt(agent._displayCount || 0, 10);
+    const next = (isNaN(current) ? 0 : current) + 1;
+    sheet.getRange(agent._rowNumber, columnNumber).setValue(next);
+    agent._displayCount = next;
+  });
 }
 
 function handleReserve_(payload) {
@@ -284,6 +402,39 @@ function matchAny_(targets, values) {
     }
   }
   return false;
+}
+
+function hasWideCoverage_(values) {
+  if (!values || !values.length) return false;
+  const wideKeywords = [
+    '全国',
+    '全国対応',
+    '全エリア',
+    'all',
+    'any',
+    'all regions',
+    'all areas'
+  ];
+  for (let i = 0; i < values.length; i += 1) {
+    const v = String(values[i] || '').toLowerCase();
+    if (!v) continue;
+    for (let j = 0; j < wideKeywords.length; j += 1) {
+      const keyword = String(wideKeywords[j]).toLowerCase();
+      if (v === keyword || v.indexOf(keyword) >= 0) return true;
+    }
+  }
+  return false;
+}
+
+function findHeaderIndex_(headers, candidates) {
+  if (!headers || !headers.length) return -1;
+  const normalizedHeaders = headers.map(h => normalizeHeader_(h));
+  for (let i = 0; i < candidates.length; i += 1) {
+    const c = normalizeHeader_(candidates[i]);
+    const idx = normalizedHeaders.indexOf(c);
+    if (idx >= 0) return idx;
+  }
+  return -1;
 }
 
 function parseAgeNumber_(ageText) {
