@@ -15,4 +15,4 @@
 ## Behavior
 
 - `action: "diagnose"`: `agents` シートから回答条件に近いエージェントを最大3件返却
-- `action: "reserve"`: 面談完了時に回答内容 + 完了時刻 + 選択エージェント情報を `applicants` に1行追記（A列は完了時間）
+- `action: "reserve"`: 面談完了時に回答内容 + 完了時刻 + 選択エージェント情報を `applicants` に1行追記（A列は完了時間、ヘッダーは日本語化）

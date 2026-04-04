@@ -351,7 +351,8 @@ function handleReserve_(payload) {
   data.completed_at_jst = Utilities.formatDate(completedAt, 'Asia/Tokyo', 'yyyy/MM/dd/ HH:mm');
   data.received_at_iso = now.toISOString();
 
-  appendObjectRowWithFirstHeader_(appSheet, data, 'completed_at_jst');
+  var localizedData = localizeApplicantData_(data);
+  appendObjectRowWithFirstHeader_(appSheet, localizedData, '完了時間');
 
   return {
     ok: true,
@@ -818,6 +819,68 @@ function appendObjectRowWithFirstHeader_(sheet, obj, firstHeader) {
 
   var row = headers.map(function(header) { return toCellValue_(obj[header]); });
   sheet.appendRow(row);
+}
+
+function localizeApplicantData_(obj) {
+  var map = {
+    completed_at_jst: '完了時間',
+    completed_at_iso: '完了時間ISO',
+    received_at_iso: '受信時間ISO',
+    reserved: '予約済み',
+    reserved_at: '予約送信時刻ISO',
+    selected_agents: '選択エージェント',
+    reservation_count: '予約件数',
+    reservation_details: '予約詳細',
+    answers_json: '回答JSON',
+    hold_token: '仮予約トークン',
+    hold_expires_at_iso: '仮予約期限ISO',
+    reservation_hash: '予約ハッシュ',
+    name: '氏名',
+    tel: '電話番号',
+    email: 'メールアドレス',
+    age: '年齢',
+    gender: '性別',
+    employment_status: '現在の就業状況',
+    living_region: '居住エリア',
+    living_prefecture: '都道府県',
+    final_education: '最終学歴',
+    university_tier: '出身大学区分',
+    company_count: '在籍企業数',
+    fulltime_exp_years: '正社員経験年数',
+    recent_job: '直近の職種',
+    management_exp: 'マネジメント経験',
+    new_env_style: '新環境での行動傾向',
+    motivation_type: 'やりがいタイプ',
+    strength_type: '得意領域',
+    pressure_tolerance: 'プレッシャー耐性',
+    work_style: '仕事の進め方',
+    competition_preference: '競争志向',
+    fit_working_style: '向いている働き方',
+    learning_attitude: '学習姿勢',
+    priority: '転職で重視するもの',
+    evaluation_preference: '評価制度の希望',
+    overtime_preference: '残業許容度',
+    relocation: '転勤可否',
+    company_environment: '希望企業環境',
+    future_goal: '将来像',
+    interest_jobs: '興味職種',
+    interest_industries: '興味業界',
+    challenge_unexperienced: '未経験挑戦意欲',
+    when_change: '転職希望時期',
+    desired_income_level: '希望年収水準',
+    consult_request: 'キャリア相談希望'
+  };
+
+  var localized = {};
+  Object.keys(obj || {}).forEach(function(key) {
+    var label = map[key] || key;
+    localized[label] = obj[key];
+  });
+
+  if (!localized['完了時間']) {
+    localized['完了時間'] = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/MM/dd/ HH:mm');
+  }
+  return localized;
 }
 
 function toCellValue_(value) {
