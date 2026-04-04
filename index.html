@@ -699,6 +699,12 @@
       box-shadow: none;
     }
 
+    .time-slot-btn.is-booked {
+      color: #9ca3af;
+      border-color: #e5e7eb;
+      background: #f9fafb;
+    }
+
     .time-slot-btn:hover {
       border-color: #ef4444;
       color: #b91c1c;
@@ -1562,20 +1568,28 @@
           }
 
           function renderSlots(dateStr) {
-            const slots = availableSlotsByDate[dateStr] || [];
+            const availableSlots = availableSlotsByDate[dateStr] || [];
+            const allSlots = DEFAULT_INTERVIEW_SLOTS.slice();
             slotGridEl.innerHTML = '';
             emptyEl.classList.add('hidden');
 
-            if (!slots.length) {
+            if (!allSlots.length) {
               emptyEl.classList.remove('hidden');
               return;
             }
 
-            slots.forEach(slot => {
+            allSlots.forEach(slot => {
               const btn = document.createElement('button');
               btn.type = 'button';
               btn.className = 'time-slot-btn';
-              btn.textContent = slot;
+              const isBooked = availableSlots.indexOf(slot) < 0;
+              btn.textContent = isBooked ? `${slot} ×` : slot;
+              if (isBooked) {
+                btn.disabled = true;
+                btn.classList.add('is-booked');
+                slotGridEl.appendChild(btn);
+                return;
+              }
               btn.addEventListener('click', async () => {
                 if (reservationSubmitting) return;
                 clearConflictMessage();
@@ -1649,7 +1663,7 @@
                     markBusyDays();
 
                     // 自動更新はせず、競合文言を出して日付選択画面へ戻す。
-                    showConflictMessage('この時間枠は先に埋まりました。別の日程を選択してください。');
+                    showConflictMessage('この時間枠は先に予約が入りました。別の日程を選択してください。');
                     timeArea.classList.add('hidden');
                     selectedDate = null;
                     calEl.querySelectorAll('.fc-daygrid-day.is-selected').forEach(el => {
