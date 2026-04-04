@@ -1,9 +1,9 @@
-const SPREADSHEET_ID = '14QAijJ_rHXxK7Kbr6704lZ2iku4VJu_ouuv5J3Ifc08';
-const AGENTS_SHEET_NAME = 'agents';
-const APPLICATIONS_SHEET_NAME = 'applications';
-const RESERVATIONS_SHEET_NAME = 'reservations';
-const DEFAULT_TOP_AGENT_COUNT = 3;
-const DEFAULT_TIME_SLOTS = [
+var SPREADSHEET_ID = '14QAijJ_rHXxK7Kbr6704lZ2iku4VJu_ouuv5J3Ifc08';
+var AGENTS_SHEET_NAME = 'agents';
+var APPLICATIONS_SHEET_NAME = 'applications';
+var RESERVATIONS_SHEET_NAME = 'reservations';
+var DEFAULT_TOP_AGENT_COUNT = 3;
+var DEFAULT_TIME_SLOTS = [
   '10:00～11:00',
   '11:00～12:00',
   '12:00～13:00',
@@ -51,7 +51,7 @@ function parsePayload_(e) {
   if (postData) {
     try {
       return JSON.parse(postData);
-    } catch (_) {
+    } catch (parseErr) {
       // Fallback to query payload when body is not JSON.
     }
   }
