@@ -10,6 +10,8 @@
     :root {
       --bg: #f5f7fb;
       --surface: #ffffff;
+      --surface-elevated: #f6f7f9;
+      --surface-deep: #eceff3;
       --text: #111827;
       --muted: #4b5563;
       --border: #e5e7eb;
@@ -215,7 +217,8 @@
     }
 
     .card {
-      background: var(--surface);
+      background: linear-gradient(180deg, #ffffff 0%, var(--surface-elevated) 100%);
+      border: 1px solid #e6e8ee;
       border-radius: var(--radius-lg);
       box-shadow: var(--shadow);
       padding: 20px 20px 16px;
@@ -273,7 +276,7 @@
       width: 100%;
       height: 4px;
       border-radius: 999px;
-      background: #f3f4f6;
+      background: #e5e7eb;
       overflow: hidden;
       margin-bottom: 16px;
     }
@@ -536,8 +539,8 @@
 
     .agent-card {
       border-radius: 16px;
-      border: 1px solid #fee2e2;
-      background: #fff;
+      border: 1px solid #e2e5ea;
+      background: linear-gradient(180deg, #ffffff 0%, #f4f5f7 100%);
       padding: 10px 10px 12px;
     }
 
@@ -656,7 +659,8 @@
       max-width: 900px;
       margin: 40px auto;
       padding: 20px;
-      background: #fff;
+      background: linear-gradient(180deg, #f7f8fa 0%, #eceff3 100%);
+      border: 1px solid #dfe3ea;
       border-radius: 12px;
     }
 
@@ -664,11 +668,11 @@
     .agent-calendar {
       margin-top: 10px;
       padding: 10px;
-      border: 1px solid #f3f4f6;
+      border: 1px solid #dbe0e7;
       border-radius: 16px;
       max-width: 320px;
       /* ← 少し小さく */
-      background: linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
+      background: linear-gradient(180deg, #f9fafb 0%, #edf1f5 100%);
     }
 
     /* 日付セル */
@@ -679,8 +683,8 @@
 
     /* hover */
     .agent-calendar .fc-daygrid-day:hover .fc-daygrid-day-frame {
-      background: #fff1f2;
-      box-shadow: inset 0 0 0 1px #fecaca;
+      background: #f0f2f5;
+      box-shadow: inset 0 0 0 1px #d5d9e1;
     }
 
     /* クリック可能感 */
@@ -705,16 +709,16 @@
     }
 
     .agent-calendar .fc-button {
-      background: #fff;
-      border: 1px solid #e5e7eb;
+      background: #f8fafc;
+      border: 1px solid #d9dee6;
       border-radius: 999px;
       padding: 2px 6px;
-      color: #6b7280;
+      color: #4b5563;
     }
 
     .agent-calendar .fc-button:hover {
-      background: #fff1f2;
-      border-color: #fecaca;
+      background: #eef0f3;
+      border-color: #d0d5dd;
     }
 
     .agent-calendar .fc-col-header-cell-cushion {
@@ -725,8 +729,10 @@
 
     .time-area {
       margin-top: 8px;
-      padding-top: 8px;
-      border-top: 1px dashed #e5e7eb;
+      padding: 10px 10px 4px;
+      border-top: 1px dashed #d7dbe2;
+      background: linear-gradient(180deg, #f8f9fb 0%, #f0f3f7 100%);
+      border-radius: 12px;
     }
 
     .calendar-hint {
@@ -801,9 +807,9 @@
     }
 
     .time-slot-btn {
-      border: 1px solid #e5e7eb;
-      background: #fff;
-      color: #374151;
+      border: 1px solid #d8dde5;
+      background: #f7f8fa;
+      color: #334155;
       border-radius: 12px;
       padding: 8px 10px;
       font-size: 12px;
@@ -827,14 +833,14 @@
 
     .time-slot-btn.is-booked {
       color: #9ca3af;
-      border-color: #e5e7eb;
-      background: #f9fafb;
+      border-color: #dde2e9;
+      background: #eceff3;
     }
 
     .time-slot-btn:hover {
-      border-color: #ef4444;
-      color: var(--accent-strong);
-      background: #fff1f2;
+      border-color: #c4cad3;
+      color: #1f2937;
+      background: #f0f2f5;
     }
 
     .time-empty {
@@ -890,7 +896,7 @@
     }
 
     .agent-calendar .fc-daygrid-day.is-unavailable .fc-daygrid-day-frame {
-      background: #f9fafb;
+      background: #eceff3;
       box-shadow: none;
     }
 
