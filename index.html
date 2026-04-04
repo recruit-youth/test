@@ -243,13 +243,13 @@
     /* tap choices */
     .pill-grid {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 8px;
     }
 
     @media (max-width:600px) {
       .pill-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: repeat(1, minmax(0, 1fr));
       }
     }
 
@@ -263,9 +263,10 @@
       cursor: pointer;
       transition: background .16s, border-color .16s, box-shadow .16s, transform .08s;
       user-select: none;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      white-space: normal;
+      overflow: visible;
+      text-overflow: clip;
+      line-height: 1.35;
     }
 
     .pill.active {
@@ -766,24 +767,49 @@
 
           <div class="wizard-header">
             <div>
-              <div class="wizard-title">STEP <span id="step-no">1</span> / <span id="step-total">5</span></div>
-              <div class="wizard-q" id="question-title">まずは基本情報を教えてください</div>
+              <div class="wizard-title">STEP <span id="step-no">1</span> / <span id="step-total">6</span></div>
+              <div class="wizard-q" id="question-title">基本属性について教えてください</div>
             </div>
-            <div style="font-size:11px;color:var(--muted);">所要時間：約1分</div>
+            <div style="font-size:11px;color:var(--muted);">所要時間：約3分</div>
           </div>
           <div class="progress-bar-wrap">
             <div class="progress-bar" id="progress-bar"></div>
           </div>
 
           <form id="diagnosis-form" novalidate>
-            <!-- STEP 1: 基本情報 -->
-            <div class="step active" data-title="まずは基本情報を教えてください">
+            <!-- STEP 1: 基本属性 -->
+            <div class="step active" data-title="基本属性について教えてください（Q1〜Q4）">
               <div class="field">
-                <div class="field-label">氏名<span class="req">必須</span></div>
-                <input type="text" name="name" placeholder="例）山田 太郎">
+                <div class="field-label">Q1. 年齢<span class="req">必須</span></div>
+                <select name="age">
+                  <option value="">選択してください</option>
+                  <option value="18歳">18歳</option>
+                  <option value="19歳">19歳</option>
+                  <option value="20歳">20歳</option>
+                  <option value="21歳">21歳</option>
+                  <option value="22歳">22歳</option>
+                  <option value="23歳">23歳</option>
+                  <option value="24歳">24歳</option>
+                  <option value="25歳">25歳</option>
+                  <option value="26歳">26歳</option>
+                  <option value="27歳">27歳</option>
+                  <option value="28歳">28歳</option>
+                  <option value="29歳">29歳</option>
+                  <option value="30歳">30歳</option>
+                  <option value="31歳">31歳</option>
+                  <option value="32歳">32歳</option>
+                  <option value="33歳">33歳</option>
+                  <option value="34歳">34歳</option>
+                  <option value="35歳">35歳</option>
+                  <option value="36歳">36歳</option>
+                  <option value="37歳">37歳</option>
+                  <option value="38歳">38歳</option>
+                  <option value="39歳">39歳</option>
+                  <option value="40歳以上">40歳以上</option>
+                </select>
               </div>
               <div class="field">
-                <div class="field-label">性別<span class="req">必須</span></div>
+                <div class="field-label">Q2. 性別<span class="req">必須</span></div>
                 <div class="pill-grid" data-name="gender">
                   <div class="pill" data-value="男性">男性</div>
                   <div class="pill" data-value="女性">女性</div>
@@ -792,123 +818,379 @@
                 <input type="hidden" name="gender">
               </div>
               <div class="field">
-                <div class="field-label">年齢<span class="req">必須</span></div>
-                <input type="number" name="age" min="18" max="39" placeholder="例）26">
-                <div class="field-help">20〜30代前半の方を主な対象としています。</div>
+                <div class="field-label">Q3. 現在の就業状況<span class="req">必須</span></div>
+                <div class="pill-grid" data-name="employment_status">
+                  <div class="pill" data-value="在職中">在職中</div>
+                  <div class="pill" data-value="離職中">離職中</div>
+                  <div class="pill" data-value="内定あり">内定あり</div>
+                  <div class="pill" data-value="退職予定">退職予定</div>
+                  <div class="pill" data-value="学生">学生</div>
+                  <div class="pill" data-value="その他">その他</div>
+                </div>
+                <input type="hidden" name="employment_status">
               </div>
-            </div>
-
-            <!-- STEP 2: 居住地・希望勤務地 -->
-            <div class="step" data-title="お住まい・希望エリアを教えてください">
               <div class="field">
-                <div class="field-label">現在お住まいの都道府県<span class="req">必須</span></div>
-                <div class="pill-grid" data-name="living_pref">
-                  <div class="pill" data-value="東京都">東京都</div>
-                  <div class="pill" data-value="神奈川県">神奈川県</div>
-                  <div class="pill" data-value="千葉県">千葉県</div>
-                  <div class="pill" data-value="埼玉県">埼玉県</div>
-                  <div class="pill" data-value="大阪府">大阪府</div>
-                  <div class="pill" data-value="愛知県">愛知県</div>
-                  <div class="pill" data-value="福岡県">福岡県</div>
+                <div class="field-label">Q4. 現在の居住エリア<span class="req">必須</span></div>
+                <div class="pill-grid" data-name="living_region">
                   <div class="pill" data-value="北海道">北海道</div>
-                  <div class="pill" data-value="その他">その他</div>
-                </div>
-                <input type="hidden" name="living_pref">
-              </div>
-              <div class="field">
-                <div class="field-label">希望勤務地（複数選択可）<span class="req">必須</span></div>
-                <div class="pill-grid" data-name="desired_area" data-multi="true">
-                  <div class="pill" data-value="首都圏">首都圏</div>
+                  <div class="pill" data-value="東北">東北</div>
+                  <div class="pill" data-value="関東">関東</div>
+                  <div class="pill" data-value="中部">中部</div>
                   <div class="pill" data-value="関西">関西</div>
-                  <div class="pill" data-value="東海">東海</div>
-                  <div class="pill" data-value="九州">九州</div>
-                  <div class="pill" data-value="北海道・東北">北海道・東北</div>
-                  <div class="pill" data-value="中国・四国">中国・四国</div>
-                  <div class="pill" data-value="全国どこでも">全国どこでも</div>
-                  <div class="pill" data-value="リモート中心">リモート中心</div>
+                  <div class="pill" data-value="中国">中国</div>
+                  <div class="pill" data-value="四国">四国</div>
+                  <div class="pill" data-value="九州・沖縄">九州・沖縄</div>
                 </div>
-                <input type="hidden" name="desired_area">
-                <div class="field-help">当てはまるエリアを選択してください。</div>
+                <input type="hidden" name="living_region">
+                <div class="field-help">地域を選択すると都道府県が表示されます。</div>
+              </div>
+              <div class="field">
+                <div class="field-label">Q4-2. 都道府県<span class="req">必須</span></div>
+                <select name="living_prefecture" id="living-prefecture-select" disabled>
+                  <option value="">先に地域を選択してください</option>
+                </select>
               </div>
             </div>
 
-            <!-- STEP 3: 経験職種・希望職種 -->
-            <div class="step" data-title="ご経験と希望職種について教えてください">
+            <!-- STEP 2: 学歴・職歴 -->
+            <div class="step" data-title="学歴・職歴について教えてください（Q5〜Q10）">
               <div class="field">
-                <div class="field-label">経験職種（メイン）<span class="req">必須</span></div>
-                <div class="pill-grid" data-name="exp_job">
-                  <div class="pill" data-value="営業">営業</div>
-                  <div class="pill" data-value="事務・アシスタント">事務・アシスタント</div>
-                  <div class="pill" data-value="販売・サービス">販売・サービス</div>
-                  <div class="pill" data-value="エンジニア（IT）">エンジニア（IT）</div>
-                  <div class="pill" data-value="施工管理">施工管理</div>
-                  <div class="pill" data-value="その他">その他</div>
+                <div class="field-label">Q5. 最終学歴<span class="req">必須</span></div>
+                <div class="pill-grid" data-name="final_education">
+                  <div class="pill" data-value="高卒">高卒</div>
+                  <div class="pill" data-value="高専卒">高専卒</div>
+                  <div class="pill" data-value="専門卒">専門卒</div>
+                  <div class="pill" data-value="短大卒">短大卒</div>
+                  <div class="pill" data-value="大卒">大卒</div>
+                  <div class="pill" data-value="大学院卒">大学院卒</div>
                 </div>
-                <input type="hidden" name="exp_job">
+                <input type="hidden" name="final_education">
               </div>
               <div class="field">
-                <div class="field-label">希望職種<span class="req">必須</span></div>
-                <div class="pill-grid" data-name="desired_job">
-                  <div class="pill" data-value="営業">営業</div>
-                  <div class="pill" data-value="事務・アシスタント">事務・アシスタント</div>
-                  <div class="pill" data-value="販売・サービス">販売・サービス</div>
-                  <div class="pill" data-value="エンジニア（IT）">エンジニア（IT）</div>
-                  <div class="pill" data-value="施工管理">施工管理</div>
-                  <div class="pill" data-value="未定・相談したい">未定・相談したい</div>
+                <div class="field-label">Q6. 出身大学の区分<span class="req">必須</span></div>
+                <div class="pill-grid" data-name="university_tier">
+                  <div class="pill" data-value="旧帝大・難関国公立">旧帝大・難関国公立</div>
+                  <div class="pill" data-value="早慶上智">早慶上智</div>
+                  <div class="pill" data-value="GMARCH・関関同立">GMARCH・関関同立</div>
+                  <div class="pill" data-value="日東駒専・産近甲龍">日東駒専・産近甲龍</div>
+                  <div class="pill" data-value="大東亜帝国・摂神追桃">大東亜帝国・摂神追桃</div>
+                  <div class="pill" data-value="その他四年制大学">その他四年制大学</div>
+                  <div class="pill" data-value="専門・短大・高専">専門・短大・高専</div>
+                  <div class="pill" data-value="高卒">高卒</div>
+                  <div class="pill" data-value="該当なし">該当なし</div>
                 </div>
-                <input type="hidden" name="desired_job">
+                <input type="hidden" name="university_tier">
               </div>
               <div class="field">
-                <div class="field-label">希望職種のご経験<span class="req">必須</span></div>
-                <div class="pill-grid" data-name="desired_job_exp">
-                  <div class="pill" data-value="経験あり">経験あり</div>
-                  <div class="pill" data-value="未経験でも挑戦したい">未経験でも挑戦したい</div>
+                <div class="field-label">Q7. これまでの在籍企業数<span class="req">必須</span></div>
+                <div class="pill-grid" data-name="company_count">
+                  <div class="pill" data-value="0社">0社</div>
+                  <div class="pill" data-value="1社">1社</div>
+                  <div class="pill" data-value="2社">2社</div>
+                  <div class="pill" data-value="3社">3社</div>
+                  <div class="pill" data-value="4社">4社</div>
+                  <div class="pill" data-value="5社以上">5社以上</div>
                 </div>
-                <input type="hidden" name="desired_job_exp">
+                <input type="hidden" name="company_count">
+              </div>
+              <div class="field">
+                <div class="field-label">Q8. 正社員経験年数<span class="req">必須</span></div>
+                <div class="pill-grid" data-name="fulltime_exp_years">
+                  <div class="pill" data-value="なし">なし</div>
+                  <div class="pill" data-value="1年未満">1年未満</div>
+                  <div class="pill" data-value="1年以上2年未満">1年以上2年未満</div>
+                  <div class="pill" data-value="2年以上3年未満">2年以上3年未満</div>
+                  <div class="pill" data-value="3年以上5年未満">3年以上5年未満</div>
+                  <div class="pill" data-value="5年以上10年未満">5年以上10年未満</div>
+                  <div class="pill" data-value="10年以上">10年以上</div>
+                </div>
+                <input type="hidden" name="fulltime_exp_years">
+              </div>
+              <div class="field">
+                <div class="field-label">Q9. 直近の職種<span class="req">必須</span></div>
+                <div class="pill-grid" data-name="recent_job">
+                  <div class="pill" data-value="個人営業">個人営業</div>
+                  <div class="pill" data-value="法人営業">法人営業</div>
+                  <div class="pill" data-value="ルート営業">ルート営業</div>
+                  <div class="pill" data-value="インサイドセールス">インサイドセールス</div>
+                  <div class="pill" data-value="販売・接客">販売・接客</div>
+                  <div class="pill" data-value="カスタマーサポート">カスタマーサポート</div>
+                  <div class="pill" data-value="事務">事務</div>
+                  <div class="pill" data-value="人事">人事</div>
+                  <div class="pill" data-value="経理">経理</div>
+                  <div class="pill" data-value="マーケティング">マーケティング</div>
+                  <div class="pill" data-value="企画">企画</div>
+                  <div class="pill" data-value="エンジニア">エンジニア</div>
+                  <div class="pill" data-value="コンサルタント">コンサルタント</div>
+                  <div class="pill" data-value="施工管理">施工管理</div>
+                  <div class="pill" data-value="技術職">技術職</div>
+                  <div class="pill" data-value="ドライバー・配送">ドライバー・配送</div>
+                  <div class="pill" data-value="医療福祉系">医療福祉系</div>
+                  <div class="pill" data-value="未経験・その他">未経験・その他</div>
+                </div>
+                <input type="hidden" name="recent_job">
+              </div>
+              <div class="field">
+                <div class="field-label">Q10. マネジメント経験<span class="req">必須</span></div>
+                <div class="pill-grid" data-name="management_exp">
+                  <div class="pill" data-value="ない">ない</div>
+                  <div class="pill" data-value="後輩指導のみ">後輩指導のみ</div>
+                  <div class="pill" data-value="2〜5名程度">2〜5名程度</div>
+                  <div class="pill" data-value="6〜10名程度">6〜10名程度</div>
+                  <div class="pill" data-value="11名以上">11名以上</div>
+                </div>
+                <input type="hidden" name="management_exp">
               </div>
             </div>
 
-            <!-- STEP 4: 年収・条件 -->
-            <div class="step" data-title="年収や転職条件について教えてください">
+            <!-- STEP 3: 性格・適性 -->
+            <div class="step" data-title="性格・適性について教えてください（Q11〜Q18）">
               <div class="field">
-                <div class="field-label">現年収（おおよそ）<span class="req">必須</span></div>
-                <input type="number" name="current_income" placeholder="例）350（万円）">
+                <div class="field-label">Q11. 新しい環境に入ったとき<span class="req">必須</span></div>
+                <div class="pill-grid" data-name="new_env_style">
+                  <div class="pill" data-value="自分から話しかける">自分から話しかける</div>
+                  <div class="pill" data-value="相手に合わせて話す">相手に合わせて話す</div>
+                  <div class="pill" data-value="まず様子を見る">まず様子を見る</div>
+                  <div class="pill" data-value="必要な時だけ話す">必要な時だけ話す</div>
+                </div>
+                <input type="hidden" name="new_env_style">
               </div>
               <div class="field">
-                <div class="field-label">希望年収<span class="req">必須</span></div>
-                <input type="number" name="desired_income" placeholder="例）420（万円）">
+                <div class="field-label">Q12. やりがいを感じやすいもの<span class="req">必須</span></div>
+                <div class="pill-grid" data-name="motivation_type">
+                  <div class="pill" data-value="数字目標の達成">数字目標の達成</div>
+                  <div class="pill" data-value="人に感謝されること">人に感謝されること</div>
+                  <div class="pill" data-value="専門性が身につくこと">専門性が身につくこと</div>
+                  <div class="pill" data-value="安定して着実に進めること">安定して着実に進めること</div>
+                </div>
+                <input type="hidden" name="motivation_type">
               </div>
               <div class="field">
-                <div class="field-label">転職希望時期<span class="req">必須</span></div>
+                <div class="field-label">Q13. どちらかというと得意なのは<span class="req">必須</span></div>
+                <div class="pill-grid" data-name="strength_type">
+                  <div class="pill" data-value="人を動かすこと">人を動かすこと</div>
+                  <div class="pill" data-value="わかりやすく説明すること">わかりやすく説明すること</div>
+                  <div class="pill" data-value="情報を整理・分析すること">情報を整理・分析すること</div>
+                  <div class="pill" data-value="正確にコツコツ進めること">正確にコツコツ進めること</div>
+                </div>
+                <input type="hidden" name="strength_type">
+              </div>
+              <div class="field">
+                <div class="field-label">Q14. プレッシャー環境への耐性<span class="req">必須</span></div>
+                <div class="pill-grid" data-name="pressure_tolerance">
+                  <div class="pill" data-value="むしろ燃える">むしろ燃える</div>
+                  <div class="pill" data-value="ある程度なら平気">ある程度なら平気</div>
+                  <div class="pill" data-value="できれば避けたい">できれば避けたい</div>
+                  <div class="pill" data-value="苦手">苦手</div>
+                </div>
+                <input type="hidden" name="pressure_tolerance">
+              </div>
+              <div class="field">
+                <div class="field-label">Q15. 仕事の進め方で近いのは<span class="req">必須</span></div>
+                <div class="pill-grid" data-name="work_style">
+                  <div class="pill" data-value="とにかくまず動く">とにかくまず動く</div>
+                  <div class="pill" data-value="考えてから動く">考えてから動く</div>
+                  <div class="pill" data-value="慎重に準備してから動く">慎重に準備してから動く</div>
+                  <div class="pill" data-value="指示がある方が動きやすい">指示がある方が動きやすい</div>
+                </div>
+                <input type="hidden" name="work_style">
+              </div>
+              <div class="field">
+                <div class="field-label">Q16. 周囲との競争について<span class="req">必須</span></div>
+                <div class="pill-grid" data-name="competition_preference">
+                  <div class="pill" data-value="好き">好き</div>
+                  <div class="pill" data-value="あった方が成長できる">あった方が成長できる</div>
+                  <div class="pill" data-value="どちらでもない">どちらでもない</div>
+                  <div class="pill" data-value="苦手">苦手</div>
+                </div>
+                <input type="hidden" name="competition_preference">
+              </div>
+              <div class="field">
+                <div class="field-label">Q17. 向いていると感じる働き方<span class="req">必須</span></div>
+                <div class="pill-grid" data-name="fit_working_style">
+                  <div class="pill" data-value="多くの人と関わる仕事">多くの人と関わる仕事</div>
+                  <div class="pill" data-value="問題解決する仕事">問題解決する仕事</div>
+                  <div class="pill" data-value="データや仕組みを扱う仕事">データや仕組みを扱う仕事</div>
+                  <div class="pill" data-value="決められた業務を安定してこなす仕事">決められた業務を安定してこなす仕事</div>
+                </div>
+                <input type="hidden" name="fit_working_style">
+              </div>
+              <div class="field">
+                <div class="field-label">Q18. 新しいことを学ぶこと<span class="req">必須</span></div>
+                <div class="pill-grid" data-name="learning_attitude">
+                  <div class="pill" data-value="かなり好き">かなり好き</div>
+                  <div class="pill" data-value="比較的好き">比較的好き</div>
+                  <div class="pill" data-value="必要ならできる">必要ならできる</div>
+                  <div class="pill" data-value="あまり得意ではない">あまり得意ではない</div>
+                </div>
+                <input type="hidden" name="learning_attitude">
+              </div>
+            </div>
+
+            <!-- STEP 4: 働き方の価値観 -->
+            <div class="step" data-title="働き方の価値観を教えてください（Q19〜Q24）">
+              <div class="field">
+                <div class="field-label">Q19. 転職で最も重視するもの<span class="req">必須</span></div>
+                <div class="pill-grid" data-name="priority">
+                  <div class="pill" data-value="年収アップ">年収アップ</div>
+                  <div class="pill" data-value="キャリアアップ">キャリアアップ</div>
+                  <div class="pill" data-value="働きやすさ">働きやすさ</div>
+                  <div class="pill" data-value="安定性">安定性</div>
+                  <div class="pill" data-value="人間関係">人間関係</div>
+                  <div class="pill" data-value="仕事内容">仕事内容</div>
+                </div>
+                <input type="hidden" name="priority">
+              </div>
+              <div class="field">
+                <div class="field-label">Q20. 理想の評価制度<span class="req">必須</span></div>
+                <div class="pill-grid" data-name="evaluation_preference">
+                  <div class="pill" data-value="成果主義">成果主義</div>
+                  <div class="pill" data-value="成果と過程の両方">成果と過程の両方</div>
+                  <div class="pill" data-value="年功や安定感もある程度ほしい">年功や安定感もある程度ほしい</div>
+                  <div class="pill" data-value="評価制度はそこまで気にしない">評価制度はそこまで気にしない</div>
+                </div>
+                <input type="hidden" name="evaluation_preference">
+              </div>
+              <div class="field">
+                <div class="field-label">Q21. 残業に対する考え方<span class="req">必須</span></div>
+                <div class="pill-grid" data-name="overtime_preference">
+                  <div class="pill" data-value="しっかり稼げるなら多くてもよい">しっかり稼げるなら多くてもよい</div>
+                  <div class="pill" data-value="月30時間程度までなら可">月30時間程度までなら可</div>
+                  <div class="pill" data-value="月20時間以内がいい">月20時間以内がいい</div>
+                  <div class="pill" data-value="できるだけ少ない方がいい">できるだけ少ない方がいい</div>
+                </div>
+                <input type="hidden" name="overtime_preference">
+              </div>
+              <div class="field">
+                <div class="field-label">Q22. 転勤について<span class="req">必須</span></div>
+                <div class="pill-grid" data-name="relocation">
+                  <div class="pill" data-value="全国転勤可能">全国転勤可能</div>
+                  <div class="pill" data-value="エリア限定なら可能">エリア限定なら可能</div>
+                  <div class="pill" data-value="引っ越しを伴わなければ可能">引っ越しを伴わなければ可能</div>
+                  <div class="pill" data-value="転勤不可">転勤不可</div>
+                </div>
+                <input type="hidden" name="relocation">
+              </div>
+              <div class="field">
+                <div class="field-label">Q23. 働く環境として合うのは<span class="req">必須</span></div>
+                <div class="pill-grid" data-name="company_environment">
+                  <div class="pill" data-value="成長中のベンチャー">成長中のベンチャー</div>
+                  <div class="pill" data-value="若手が活躍しやすい企業">若手が活躍しやすい企業</div>
+                  <div class="pill" data-value="大手・安定企業">大手・安定企業</div>
+                  <div class="pill" data-value="どちらも検討したい">どちらも検討したい</div>
+                </div>
+                <input type="hidden" name="company_environment">
+              </div>
+              <div class="field">
+                <div class="field-label">Q24. 将来的に目指したい姿<span class="req">必須</span></div>
+                <div class="pill-grid" data-name="future_goal">
+                  <div class="pill" data-value="高年収を目指したい">高年収を目指したい</div>
+                  <div class="pill" data-value="管理職になりたい">管理職になりたい</div>
+                  <div class="pill" data-value="専門性を高めたい">専門性を高めたい</div>
+                  <div class="pill" data-value="ワークライフバランス重視で働きたい">ワークライフバランス重視で働きたい</div>
+                  <div class="pill" data-value="まだ明確ではない">まだ明確ではない</div>
+                </div>
+                <input type="hidden" name="future_goal">
+              </div>
+            </div>
+
+            <!-- STEP 5: 興味職種・業界 -->
+            <div class="step" data-title="興味職種・業界について教えてください（Q25〜Q27）">
+              <div class="field">
+                <div class="field-label">Q25. 今後興味がある職種<span class="req">必須</span></div>
+                <div class="pill-grid" data-name="interest_jobs" data-multi="true">
+                  <div class="pill" data-value="個人営業">個人営業</div>
+                  <div class="pill" data-value="法人営業">法人営業</div>
+                  <div class="pill" data-value="ルート営業">ルート営業</div>
+                  <div class="pill" data-value="キャリアアドバイザー">キャリアアドバイザー</div>
+                  <div class="pill" data-value="リクルーティングアドバイザー">リクルーティングアドバイザー</div>
+                  <div class="pill" data-value="販売・接客">販売・接客</div>
+                  <div class="pill" data-value="カスタマーサクセス">カスタマーサクセス</div>
+                  <div class="pill" data-value="カスタマーサポート">カスタマーサポート</div>
+                  <div class="pill" data-value="事務">事務</div>
+                  <div class="pill" data-value="営業事務">営業事務</div>
+                  <div class="pill" data-value="人事">人事</div>
+                  <div class="pill" data-value="経理">経理</div>
+                  <div class="pill" data-value="マーケティング">マーケティング</div>
+                  <div class="pill" data-value="Webマーケティング">Webマーケティング</div>
+                  <div class="pill" data-value="企画">企画</div>
+                  <div class="pill" data-value="コンサルタント">コンサルタント</div>
+                  <div class="pill" data-value="エンジニア">エンジニア</div>
+                  <div class="pill" data-value="ITサポート">ITサポート</div>
+                  <div class="pill" data-value="施工管理">施工管理</div>
+                  <div class="pill" data-value="技術職">技術職</div>
+                  <div class="pill" data-value="ドライバー・配送">ドライバー・配送</div>
+                  <div class="pill" data-value="未経験でも合うものを知りたい">未経験でも合うものを知りたい</div>
+                </div>
+                <input type="hidden" name="interest_jobs">
+                <div class="field-help">複数選択できます。</div>
+              </div>
+              <div class="field">
+                <div class="field-label">Q26. 興味がある業界<span class="req">必須</span></div>
+                <div class="pill-grid" data-name="interest_industries" data-multi="true">
+                  <div class="pill" data-value="IT・Web">IT・Web</div>
+                  <div class="pill" data-value="人材">人材</div>
+                  <div class="pill" data-value="広告・メディア">広告・メディア</div>
+                  <div class="pill" data-value="コンサル">コンサル</div>
+                  <div class="pill" data-value="メーカー">メーカー</div>
+                  <div class="pill" data-value="商社">商社</div>
+                  <div class="pill" data-value="金融">金融</div>
+                  <div class="pill" data-value="不動産">不動産</div>
+                  <div class="pill" data-value="小売・流通">小売・流通</div>
+                  <div class="pill" data-value="物流・運輸">物流・運輸</div>
+                  <div class="pill" data-value="建設・不動産">建設・不動産</div>
+                  <div class="pill" data-value="医療・福祉">医療・福祉</div>
+                  <div class="pill" data-value="サービス">サービス</div>
+                  <div class="pill" data-value="特に決まっていない">特に決まっていない</div>
+                </div>
+                <input type="hidden" name="interest_industries">
+                <div class="field-help">複数選択できます。</div>
+              </div>
+              <div class="field">
+                <div class="field-label">Q27. 未経験職種への挑戦意欲<span class="req">必須</span></div>
+                <div class="pill-grid" data-name="challenge_unexperienced">
+                  <div class="pill" data-value="ぜひ挑戦したい">ぜひ挑戦したい</div>
+                  <div class="pill" data-value="良い条件なら挑戦したい">良い条件なら挑戦したい</div>
+                  <div class="pill" data-value="できれば経験職種がよい">できれば経験職種がよい</div>
+                  <div class="pill" data-value="絶対に経験職種がよい">絶対に経験職種がよい</div>
+                </div>
+                <input type="hidden" name="challenge_unexperienced">
+              </div>
+            </div>
+
+            <!-- STEP 6: 転職希望条件・温度感 -->
+            <div class="step" data-title="転職希望条件・温度感を教えてください（Q28〜Q30）">
+              <div class="field">
+                <div class="field-label">Q28. 転職希望時期<span class="req">必須</span></div>
                 <div class="pill-grid" data-name="when_change">
-                  <div class="pill" data-value="できるだけ早く">できるだけ早く</div>
+                  <div class="pill" data-value="すぐにでも転職したい">すぐにでも転職したい</div>
+                  <div class="pill" data-value="1ヶ月以内">1ヶ月以内</div>
                   <div class="pill" data-value="3ヶ月以内">3ヶ月以内</div>
-                  <div class="pill" data-value="よい求人があれば">よい求人があれば</div>
+                  <div class="pill" data-value="半年以内">半年以内</div>
+                  <div class="pill" data-value="良い求人があれば考えたい">良い求人があれば考えたい</div>
+                  <div class="pill" data-value="まずは情報収集したい">まずは情報収集したい</div>
                 </div>
                 <input type="hidden" name="when_change">
               </div>
-            </div>
-
-            <!-- STEP 5: 連絡先 -->
-            <div class="step" data-title="面談調整に使うご連絡先を教えてください">
               <div class="field">
-                <div class="field-label">電話番号<span class="req">必須</span></div>
-                <input type="tel" name="tel" placeholder="例）08012345678">
-                <div class="field-help">日程確定のご連絡のみに使用します。</div>
-              </div>
-              <div class="field">
-                <div class="field-label">メールアドレス<span class="req">必須</span></div>
-                <input type="email" name="email" placeholder="例）example@mail.com">
-              </div>
-              <div class="field">
-                <div class="field-label">連絡がつきやすい時間帯<span class="req">必須</span></div>
-                <div class="pill-grid" data-name="contact_time">
-                  <div class="pill" data-value="午前中">午前中</div>
-                  <div class="pill" data-value="12〜15時">12〜15時</div>
-                  <div class="pill" data-value="15〜18時">15〜18時</div>
-                  <div class="pill" data-value="18時以降">18時以降</div>
+                <div class="field-label">Q29. 希望年収<span class="req">必須</span></div>
+                <div class="pill-grid" data-name="desired_income_level">
+                  <div class="pill" data-value="現状維持でよい">現状維持でよい</div>
+                  <div class="pill" data-value="50万円以上上げたい">50万円以上上げたい</div>
+                  <div class="pill" data-value="100万円以上上げたい">100万円以上上げたい</div>
+                  <div class="pill" data-value="150万円以上上げたい">150万円以上上げたい</div>
+                  <div class="pill" data-value="年収より働き方重視">年収より働き方重視</div>
                 </div>
-                <input type="hidden" name="contact_time">
+                <input type="hidden" name="desired_income_level">
+              </div>
+              <div class="field">
+                <div class="field-label">Q30. 診断結果をもとにキャリア相談<span class="req">必須</span></div>
+                <div class="pill-grid" data-name="consult_request">
+                  <div class="pill" data-value="ぜひ受けたい">ぜひ受けたい</div>
+                  <div class="pill" data-value="良い担当者がいれば受けたい">良い担当者がいれば受けたい</div>
+                  <div class="pill" data-value="今は診断だけでよい">今は診断だけでよい</div>
+                </div>
+                <input type="hidden" name="consult_request">
               </div>
             </div>
 
@@ -1006,6 +1288,16 @@
       let currentStep = 0;
       const totalSteps = steps.length;
       stepTotalEl.textContent = totalSteps;
+      const PREFECTURES_BY_REGION = {
+        '北海道': ['北海道'],
+        '東北': ['青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県'],
+        '関東': ['茨城県', '栃木県', '群馬県', '埼玉県', '千葉県', '東京都', '神奈川県'],
+        '中部': ['新潟県', '富山県', '石川県', '福井県', '山梨県', '長野県', '岐阜県', '静岡県', '愛知県'],
+        '関西': ['三重県', '滋賀県', '京都府', '大阪府', '兵庫県', '奈良県', '和歌山県'],
+        '中国': ['鳥取県', '島根県', '岡山県', '広島県', '山口県'],
+        '四国': ['徳島県', '香川県', '愛媛県', '高知県'],
+        '九州・沖縄': ['福岡県', '佐賀県', '長崎県', '熊本県', '大分県', '宮崎県', '鹿児島県', '沖縄県']
+      };
 
       function updateStep() {
         steps.forEach((s, i) => s.classList.toggle('active', i === currentStep));
@@ -1019,10 +1311,46 @@
 
       function getRequiredNamesForStep(stepEl) {
         const names = [];
-        Array.from(stepEl.querySelectorAll('input[name]')).forEach(inp => {
-          names.push(inp.name);
+        Array.from(stepEl.querySelectorAll('input[name], select[name]')).forEach(el => {
+          names.push(el.name);
         });
         return Array.from(new Set(names));
+      }
+
+      function setupRegionPrefectureLinkage() {
+        const regionInput = form.querySelector('input[name="living_region"]');
+        const prefectureSelect = form.querySelector('#living-prefecture-select');
+        if (!regionInput || !prefectureSelect) return;
+
+        const renderPrefectureOptions = (region) => {
+          const prefectures = PREFECTURES_BY_REGION[region] || [];
+          prefectureSelect.innerHTML = '';
+          prefectureSelect.value = '';
+
+          if (!prefectures.length) {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = '先に地域を選択してください';
+            prefectureSelect.appendChild(option);
+            prefectureSelect.disabled = true;
+            return;
+          }
+
+          const placeholder = document.createElement('option');
+          placeholder.value = '';
+          placeholder.textContent = '都道府県を選択してください';
+          prefectureSelect.appendChild(placeholder);
+          prefectures.forEach(pref => {
+            const option = document.createElement('option');
+            option.value = pref;
+            option.textContent = pref;
+            prefectureSelect.appendChild(option);
+          });
+          prefectureSelect.disabled = false;
+        };
+
+        renderPrefectureOptions(regionInput.value);
+        form.__renderPrefectureOptions = renderPrefectureOptions;
       }
 
       function validateStep() {
@@ -1348,10 +1676,14 @@
             grid.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
             pill.classList.add('active');
             hiddenInput.value = value;
+            if (name === 'living_region' && typeof form.__renderPrefectureOptions === 'function') {
+              form.__renderPrefectureOptions(value);
+            }
           }
         });
       });
 
+      setupRegionPrefectureLinkage();
       updateStep();
 
       // ★結果ページ → 診断フォームへ戻る
