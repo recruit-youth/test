@@ -1,6 +1,6 @@
 var SPREADSHEET_ID = '14QAijJ_rHXxK7Kbr6704lZ2iku4VJu_ouuv5J3Ifc08';
 var AGENTS_SHEET_NAME = 'agents';
-var APPLICATIONS_SHEET_NAME = 'applications';
+var APPLICANTS_SHEET_NAME = 'applicants';
 var RESERVATIONS_SHEET_NAME = 'reservations';
 var DEFAULT_TOP_AGENT_COUNT = 3;
 var HOLD_TTL_MINUTES = 10;
@@ -341,21 +341,21 @@ function handleReserve_(payload) {
     lock.releaseLock();
   }
 
-  var appSheet = getOrCreateSheet_(APPLICATIONS_SHEET_NAME);
+  var appSheet = getOrCreateSheet_(APPLICANTS_SHEET_NAME);
   var data = Object.assign({}, payload);
   delete data.action;
 
   if (!data.completed_at_iso) data.completed_at_iso = now.toISOString();
-  if (!data.completed_at_jst) {
-    data.completed_at_jst = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm:ss');
-  }
+  var completedAt = new Date(data.completed_at_iso);
+  if (String(completedAt) === 'Invalid Date') completedAt = now;
+  data.completed_at_jst = Utilities.formatDate(completedAt, 'Asia/Tokyo', 'yyyy/MM/dd/ HH:mm');
   data.received_at_iso = now.toISOString();
 
-  appendObjectRow_(appSheet, data);
+  appendObjectRowWithFirstHeader_(appSheet, data, 'completed_at_jst');
 
   return {
     ok: true,
-    sheet: APPLICATIONS_SHEET_NAME,
+    sheet: APPLICANTS_SHEET_NAME,
     row: appSheet.getLastRow()
   };
 }
@@ -781,6 +781,36 @@ function appendObjectRow_(sheet, obj) {
   keys.forEach(function(key) {
     if (headers.indexOf(key) < 0) headers.push(key);
   });
+
+  if (headers.length > 0) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+
+  var row = headers.map(function(header) { return toCellValue_(obj[header]); });
+  sheet.appendRow(row);
+}
+
+function appendObjectRowWithFirstHeader_(sheet, obj, firstHeader) {
+  var keys = Object.keys(obj);
+  if (!keys.length) return;
+
+  var headers = [];
+  var lastRow = sheet.getLastRow();
+  var lastCol = sheet.getLastColumn();
+
+  if (lastRow > 0 && lastCol > 0) {
+    headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0]
+      .map(function(v) { return String(v || '').trim(); });
+  }
+
+  keys.forEach(function(key) {
+    if (headers.indexOf(key) < 0) headers.push(key);
+  });
+
+  if (firstHeader) {
+    headers = headers.filter(function(h) { return h !== firstHeader; });
+    headers.unshift(firstHeader);
+  }
 
   if (headers.length > 0) {
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
