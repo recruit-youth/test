@@ -122,34 +122,8 @@
       margin-bottom: 12px;
     }
 
-    .intro-handwrite-wrap {
-      width: min(100%, 480px);
-      margin: 2px auto 10px;
-    }
-
-    .intro-handwrite {
-      display: block;
-      width: 100%;
-      height: auto;
-    }
-
-    .intro-handwrite-text {
-      font-size: 78px;
-      font-family: 'Alex Brush', 'Parisienne', cursive;
-      font-weight: 400;
-      fill: transparent;
-      stroke: rgba(15, 118, 110, .58);
-      stroke-width: 2.2;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-      stroke-dasharray: 1000;
-      stroke-dashoffset: 1000;
-      animation: introStrokeDraw 2.2s ease forwards, introFillIn .35s linear 2.05s forwards;
-      transform: translateX(2px);
-    }
-
     .intro-title {
-      margin: 0 0 8px;
+      margin: 2px 0 8px;
       font-size: 28px;
       line-height: 1.4;
       color: #0f766e;
@@ -1041,18 +1015,6 @@
       }
     }
 
-    @keyframes introStrokeDraw {
-      to {
-        stroke-dashoffset: 0;
-      }
-    }
-
-    @keyframes introFillIn {
-      to {
-        fill: rgba(13, 148, 136, .62);
-      }
-    }
-
     @keyframes introLogoFloat {
       from {
         transform: translateY(-2px);
@@ -1087,19 +1049,6 @@
     <div class="intro-card">
       <img class="intro-logo" src="https://youthjob.co.jp/wp-content/uploads/2025/09/yj_logo.png" alt="株式会社ユースジョブ ロゴ">
       <div class="intro-company">株式会社ユースジョブ</div>
-      <div class="intro-handwrite-wrap" aria-hidden="true">
-        <svg class="intro-handwrite" viewBox="0 0 1200 140">
-          <defs>
-            <filter id="intro-hand-rough">
-              <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="1" seed="2" result="n" />
-              <feDisplacementMap in="SourceGraphic" in2="n" scale="0.5" xChannelSelector="R" yChannelSelector="G" />
-            </filter>
-          </defs>
-          <text x="0" y="95" class="intro-handwrite-text" filter="url(#intro-hand-rough)">
-            accelerates your growth.
-          </text>
-        </svg>
-      </div>
       <h1 class="intro-title">適職診断へようこそ</h1>
       <p class="intro-sub">
         あなたの回答をもとに、相性のよいエージェントをご提案します。<br>
