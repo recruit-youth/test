@@ -8,18 +8,18 @@
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
   <style>
     :root {
-      --bg: #f5f7fb;
+      --bg: #ecfeff;
       --surface: #ffffff;
-      --text: #111827;
-      --muted: #4b5563;
-      --border: #e5e7eb;
-      --accent: #ef4444;
-      --accent-soft: #fee2e2;
-      --accent-grad-from: #ef4444;
-      --accent-grad-to: #fb923c;
-      --accent-strong: #b91c1c;
-      --accent-ring: rgba(239, 68, 68, .35);
-      --accent-shadow: rgba(239, 68, 68, .30);
+      --text: #083344;
+      --muted: #155e75;
+      --border: #bae6fd;
+      --accent: #22d3ee;
+      --accent-soft: #cffafe;
+      --accent-grad-from: #06b6d4;
+      --accent-grad-to: #2dd4bf;
+      --accent-strong: #0f766e;
+      --accent-ring: rgba(34, 211, 238, .35);
+      --accent-shadow: rgba(8, 145, 178, .30);
       --shadow: 0 18px 40px rgba(15, 23, 42, 0.219);
       --radius-lg: 20px;
     }
@@ -32,9 +32,9 @@
       margin: 0;
       font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "YuGothic", "Yu Gothic", sans-serif;
       background:
-        radial-gradient(1200px 560px at -10% -5%, rgba(251, 113, 133, .16) 0%, rgba(251, 113, 133, 0) 60%),
-        radial-gradient(900px 520px at 110% 0%, rgba(251, 146, 60, .14) 0%, rgba(251, 146, 60, 0) 62%),
-        linear-gradient(160deg, #fef2f2 0%, #f8fafc 48%, #fff7ed 100%);
+        radial-gradient(1200px 560px at -10% -5%, rgba(34, 211, 238, .20) 0%, rgba(34, 211, 238, 0) 60%),
+        radial-gradient(900px 520px at 110% 0%, rgba(45, 212, 191, .18) 0%, rgba(45, 212, 191, 0) 62%),
+        linear-gradient(160deg, #effefe 0%, #f0faff 48%, #ecfffb 100%);
       color: var(--text);
     }
 
@@ -51,9 +51,9 @@
       justify-content: center;
       padding: 20px;
       background:
-        radial-gradient(1000px 480px at 8% 0%, rgba(239, 68, 68, .20) 0%, rgba(239, 68, 68, 0) 64%),
-        radial-gradient(860px 420px at 94% 5%, rgba(251, 146, 60, .20) 0%, rgba(251, 146, 60, 0) 62%),
-        linear-gradient(140deg, #fff5f5 0%, #f8fafc 50%, #fff7ed 100%);
+        radial-gradient(980px 460px at 8% 0%, rgba(34, 211, 238, .32) 0%, rgba(34, 211, 238, 0) 64%),
+        radial-gradient(900px 430px at 94% 5%, rgba(45, 212, 191, .28) 0%, rgba(45, 212, 191, 0) 62%),
+        linear-gradient(140deg, #e8fffd 0%, #ebfcff 54%, #f0fffb 100%);
       transition: transform .55s ease, opacity .55s ease;
       overflow: hidden;
       perspective: 1200px;
@@ -64,7 +64,7 @@
       position: absolute;
       inset: -25%;
       background:
-        conic-gradient(from 120deg at 25% 35%, rgba(239, 68, 68, .18), rgba(251, 146, 60, .14), rgba(239, 68, 68, .08), rgba(239, 68, 68, .18));
+        conic-gradient(from 120deg at 25% 35%, rgba(34, 211, 238, .24), rgba(45, 212, 191, .20), rgba(20, 184, 166, .12), rgba(34, 211, 238, .24));
       filter: blur(42px);
       animation: introGlow 9s ease-in-out infinite alternate;
       pointer-events: none;
@@ -83,14 +83,23 @@
     .intro-card {
       width: 100%;
       max-width: 560px;
-      background: linear-gradient(160deg, #ffffff 0%, #fff7ed 100%);
-      border: 1px solid rgba(255, 255, 255, .68);
+      background: linear-gradient(160deg, #f5fffe 0%, #eafffb 100%);
+      border: 1px solid rgba(15, 118, 110, .16);
       border-radius: 24px;
       padding: 34px 24px 28px;
       box-shadow: 0 26px 64px rgba(15, 23, 42, .24);
       text-align: center;
       transform-origin: center;
       backface-visibility: hidden;
+    }
+
+    .intro-logo {
+      width: min(320px, 72%);
+      height: auto;
+      margin: 0 auto 12px;
+      display: block;
+      filter: drop-shadow(0 6px 20px rgba(8, 145, 178, .25));
+      animation: introLogoFloat 3.6s ease-in-out infinite alternate;
     }
 
     .intro-screen.is-leaving .intro-card {
@@ -103,24 +112,52 @@
       gap: 8px;
       font-size: 14px;
       font-weight: 700;
-      color: var(--accent-strong);
-      background: var(--accent-soft);
+      color: #0f766e;
+      background: rgba(20, 184, 166, .13);
       border-radius: 999px;
       padding: 6px 12px;
       margin-bottom: 12px;
+    }
+
+    .intro-handwrite-wrap {
+      width: min(100%, 480px);
+      margin: 2px auto 10px;
+    }
+
+    .intro-handwrite {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .intro-handwrite-text {
+      font-size: 78px;
+      font-family: 'Alex Brush', 'Parisienne', cursive;
+      font-weight: 400;
+      fill: transparent;
+      stroke: rgba(15, 118, 110, .58);
+      stroke-width: 2.2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-dasharray: 1000;
+      stroke-dashoffset: 1000;
+      animation: introStrokeDraw 2.2s ease forwards, introFillIn .35s linear 2.05s forwards;
+      transform: translateX(2px);
     }
 
     .intro-title {
       margin: 0 0 8px;
       font-size: 28px;
       line-height: 1.4;
+      color: #0f766e;
     }
 
     .intro-sub {
       margin: 0 0 22px;
-      color: var(--muted);
+      color: #0f766e;
       font-size: 13px;
       line-height: 1.7;
+      opacity: .88;
     }
 
     .intro-start-btn {
@@ -131,14 +168,14 @@
       font-weight: 700;
       color: #fff;
       cursor: pointer;
-      background: linear-gradient(90deg, var(--accent-grad-from), var(--accent-grad-to));
-      box-shadow: 0 14px 28px var(--accent-shadow);
+      background: linear-gradient(90deg, #0ea5b7, #14b8a6);
+      box-shadow: 0 14px 28px rgba(8, 145, 178, .30);
       transition: transform .1s ease, box-shadow .16s ease;
     }
 
     .intro-start-btn:hover {
       transform: translateY(-1px);
-      box-shadow: 0 18px 34px rgba(239, 68, 68, .34);
+      box-shadow: 0 18px 34px rgba(8, 145, 178, .36);
     }
 
     .page {
@@ -193,9 +230,9 @@
     .hero-tag {
       padding: 4px 12px;
       border-radius: 999px;
-      border: 1px solid #fecaca;
-      background: rgba(254, 242, 242, .9);
-      color: var(--accent-strong);
+      border: 1px solid #67e8f9;
+      background: rgba(236, 254, 255, .92);
+      color: #0f766e;
       font-size: 11px;
       font-weight: 600;
     }
@@ -244,9 +281,9 @@
       font-size: 11px;
       padding: 4px 8px;
       border-radius: 999px;
-      background: #f3f4ff;
-      color: #4338ca;
-      border: 1px solid #e5e7eb;
+      background: #cffafe;
+      color: #0f766e;
+      border: 1px solid #a5f3fc;
     }
 
     /* wizard */
@@ -273,7 +310,7 @@
       width: 100%;
       height: 4px;
       border-radius: 999px;
-      background: #f3f4f6;
+      background: #dff8fb;
       overflow: hidden;
       margin-bottom: 16px;
     }
@@ -350,13 +387,13 @@
       font-size: 13px;
       outline: none;
       transition: border-color .16s, box-shadow .16s, background .16s;
-      background: #f9fafb;
+      background: #f0fdff;
     }
 
     input:focus,
     select:focus {
-      border-color: #fecaca;
-      box-shadow: 0 0 0 1px #fecaca;
+      border-color: #7dd3fc;
+      box-shadow: 0 0 0 1px #7dd3fc;
       background: #fff;
     }
 
@@ -379,7 +416,7 @@
       padding: 10px 6px;
       font-size: 12px;
       text-align: center;
-      background: #fff;
+      background: #f7fdff;
       cursor: pointer;
       transition: background .16s, border-color .16s, box-shadow .16s, transform .08s;
       user-select: none;
@@ -393,7 +430,7 @@
       background: linear-gradient(90deg, var(--accent-grad-from), var(--accent-grad-to));
       border-color: transparent;
       color: #fff;
-      box-shadow: 0 0 0 1px rgba(99, 102, 241, .10);
+      box-shadow: 0 0 0 1px rgba(34, 211, 238, .10);
       transform: translateY(-1px);
     }
 
@@ -411,7 +448,7 @@
       font-size: 13px;
       font-weight: 600;
       border: 1px solid transparent;
-      background: #fff;
+      background: #f5feff;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
@@ -430,11 +467,11 @@
     .btn-secondary {
       border-color: var(--border);
       color: var(--muted);
-      background: #f9fafb;
+      background: #ecfeff;
     }
 
     .btn-secondary:hover:not(:disabled) {
-      background: #f3f4f6;
+      background: #dff8fb;
     }
 
     .btn-primary {
@@ -445,11 +482,11 @@
 
     .btn-primary:hover:not(:disabled) {
       transform: translateY(-1px);
-      box-shadow: 0 14px 30px rgba(239, 68, 68, .36);
+      box-shadow: 0 14px 30px rgba(8, 145, 178, .36);
     }
 
     .error-msg {
-      color: #b91c1c;
+      color: #0f766e;
       font-size: 11px;
       margin-top: 4px;
       min-height: 14px;
@@ -485,14 +522,14 @@
       align-items: center;
       justify-content: center;
       font-size: 11px;
-      color: var(--accent-strong);
+      color: #0f766e;
       flex-shrink: 0;
     }
 
     .right-foot {
       font-size: 11px;
       color: var(--muted);
-      border-top: 1px dashed #e5e7eb;
+      border-top: 1px dashed #7dd3fc;
       padding-top: 8px;
       margin-top: 8px;
     }
@@ -536,8 +573,8 @@
 
     .agent-card {
       border-radius: 16px;
-      border: 1px solid #fee2e2;
-      background: #fff;
+      border: 1px solid #bae6fd;
+      background: linear-gradient(180deg, #f8feff 0%, #effcff 100%);
       padding: 10px 10px 12px;
     }
 
@@ -641,7 +678,8 @@
     #reserveResult {
       max-width: 720px;
       margin: 80px auto 0;
-      background: #fff;
+      background: linear-gradient(180deg, #f8feff 0%, #ecfdff 100%);
+      border: 1px solid #bae6fd;
       border-radius: 20px;
       padding: 32px 24px;
       box-shadow: 0 18px 40px rgba(15, 23, 42, .15);
@@ -656,7 +694,8 @@
       max-width: 900px;
       margin: 40px auto;
       padding: 20px;
-      background: #fff;
+      background: linear-gradient(180deg, #f5feff 0%, #e8fbff 100%);
+      border: 1px solid #bae6fd;
       border-radius: 12px;
     }
 
@@ -664,11 +703,11 @@
     .agent-calendar {
       margin-top: 10px;
       padding: 10px;
-      border: 1px solid #f3f4f6;
+      border: 1px solid #bae6fd;
       border-radius: 16px;
       max-width: 320px;
       /* ← 少し小さく */
-      background: linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
+      background: linear-gradient(180deg, #f9feff 0%, #eefcff 100%);
     }
 
     /* 日付セル */
@@ -679,8 +718,8 @@
 
     /* hover */
     .agent-calendar .fc-daygrid-day:hover .fc-daygrid-day-frame {
-      background: #fff1f2;
-      box-shadow: inset 0 0 0 1px #fecaca;
+      background: #d7f7fc;
+      box-shadow: inset 0 0 0 1px #67e8f9;
     }
 
     /* クリック可能感 */
@@ -692,7 +731,7 @@
     .agent-calendar .fc-daygrid-day-number {
       font-size: 10px;
       padding: 4px;
-      color: #374151;
+      color: #0e7490;
     }
 
     .agent-calendar .fc-toolbar {
@@ -705,16 +744,16 @@
     }
 
     .agent-calendar .fc-button {
-      background: #fff;
-      border: 1px solid #e5e7eb;
+      background: #f0fdff;
+      border: 1px solid #7dd3fc;
       border-radius: 999px;
       padding: 2px 6px;
-      color: #6b7280;
+      color: #0e7490;
     }
 
     .agent-calendar .fc-button:hover {
-      background: #fff1f2;
-      border-color: #fecaca;
+      background: #ecfeff;
+      border-color: #67e8f9;
     }
 
     .agent-calendar .fc-col-header-cell-cushion {
@@ -726,27 +765,27 @@
     .time-area {
       margin-top: 8px;
       padding-top: 8px;
-      border-top: 1px dashed #e5e7eb;
+      border-top: 1px dashed #7dd3fc;
     }
 
     .calendar-hint {
       font-size: 11px;
-      color: #6b7280;
+      color: #0e7490;
       margin: 6px 0 2px;
     }
 
     .availability-loading {
       font-size: 11px;
-      color: #6b7280;
+      color: #0e7490;
       margin-top: 6px;
     }
 
     .slot-conflict-msg {
       margin-top: 6px;
       font-size: 11px;
-      color: #b91c1c;
-      background: #fee2e2;
-      border: 1px solid #fecaca;
+      color: #0f766e;
+      background: #ccfbf1;
+      border: 1px solid #99f6e4;
       border-radius: 10px;
       padding: 6px 8px;
     }
@@ -801,9 +840,9 @@
     }
 
     .time-slot-btn {
-      border: 1px solid #e5e7eb;
-      background: #fff;
-      color: #374151;
+      border: 1px solid #7dd3fc;
+      background: #f0fdff;
+      color: #0e7490;
       border-radius: 12px;
       padding: 8px 10px;
       font-size: 12px;
@@ -814,27 +853,27 @@
       border-color: transparent;
       color: #fff;
       background: linear-gradient(90deg, var(--accent-grad-from), var(--accent-grad-to));
-      box-shadow: 0 8px 20px rgba(239, 68, 68, .25);
+      box-shadow: 0 8px 20px rgba(8, 145, 178, .25);
     }
 
     .time-slot-btn:disabled {
       cursor: not-allowed;
-      color: #9ca3af;
-      border-color: #e5e7eb;
-      background: #f9fafb;
+      color: #94a3b8;
+      border-color: #cfe9ee;
+      background: #f0fbfc;
       box-shadow: none;
     }
 
     .time-slot-btn.is-booked {
-      color: #9ca3af;
-      border-color: #e5e7eb;
-      background: #f9fafb;
+      color: #94a3b8;
+      border-color: #cfe9ee;
+      background: #f0fbfc;
     }
 
     .time-slot-btn:hover {
-      border-color: #ef4444;
-      color: var(--accent-strong);
-      background: #fff1f2;
+      border-color: #06b6d4;
+      color: #0f766e;
+      background: #ecfeff;
     }
 
     .time-empty {
@@ -880,8 +919,8 @@
 
     /* ==== クリックされた日付のハイライト（選択日） ==== */
     .agent-calendar .fc-daygrid-day.is-selected .fc-daygrid-day-frame {
-      background: #fee2e2;
-      box-shadow: inset 0 0 0 2px #ef4444;
+      background: #ccfbf1;
+      box-shadow: inset 0 0 0 2px #14b8a6;
     }
 
     .agent-calendar .fc-daygrid-day.is-selected .fc-daygrid-day-number {
@@ -890,19 +929,19 @@
     }
 
     .agent-calendar .fc-daygrid-day.is-unavailable .fc-daygrid-day-frame {
-      background: #f9fafb;
+      background: #ecfeff;
       box-shadow: none;
     }
 
     .agent-calendar .fc-daygrid-day.is-unavailable .fc-daygrid-day-number {
-      color: #d1d5db;
+      color: #9dd8e4;
     }
 
     .reserve-status {
       font-size: 11px;
-      color: #6b7280;
-      background: #f3f4f6;
-      border: 1px solid #e5e7eb;
+      color: #0e7490;
+      background: #ecfeff;
+      border: 1px solid #7dd3fc;
       padding: 4px 8px;
       border-radius: 999px;
       white-space: nowrap;
@@ -1019,7 +1058,21 @@
 <body class="intro-active">
   <section id="introScreen" class="intro-screen">
     <div class="intro-card">
+      <img class="intro-logo" src="https://youthjob.co.jp/wp-content/uploads/2025/09/yj_logo.png" alt="株式会社ユースジョブ ロゴ">
       <div class="intro-company">株式会社ユースジョブ</div>
+      <div class="intro-handwrite-wrap" aria-hidden="true">
+        <svg class="intro-handwrite" viewBox="0 0 1200 140">
+          <defs>
+            <filter id="intro-hand-rough">
+              <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="1" seed="2" result="n" />
+              <feDisplacementMap in="SourceGraphic" in2="n" scale="0.5" xChannelSelector="R" yChannelSelector="G" />
+            </filter>
+          </defs>
+          <text x="0" y="95" class="intro-handwrite-text" filter="url(#intro-hand-rough)">
+            each step expands your possibilities.
+          </text>
+        </svg>
+      </div>
       <h1 class="intro-title">適職診断へようこそ</h1>
       <p class="intro-sub">
         あなたの回答をもとに、相性のよいエージェントをご提案します。<br>
