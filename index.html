@@ -616,6 +616,12 @@
       filter: grayscale(.15);
     }
 
+    .reserve-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
     .loading {
       display: none;
       font-size: 12px;
@@ -718,8 +724,8 @@
       padding: 10px;
       border: 1px solid #bae6fd;
       border-radius: 16px;
-      max-width: 320px;
-      /* ← 少し小さく */
+      max-width: 420px;
+      width: 100%;
       background: linear-gradient(180deg, #f9feff 0%, #eefcff 100%);
     }
 
@@ -852,6 +858,63 @@
       }
     }
 
+    @media (max-width:640px) {
+      .agent-card {
+        padding: 12px;
+      }
+
+      .agent-calendar {
+        max-width: none;
+        padding: 8px;
+      }
+
+      .agent-calendar .fc-toolbar {
+        gap: 6px;
+      }
+
+      .agent-calendar .fc-header-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        row-gap: 6px;
+      }
+
+      .agent-calendar .fc-toolbar-chunk {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .agent-calendar .fc-toolbar-title {
+        font-size: 13px;
+      }
+
+      .agent-calendar .fc-button {
+        font-size: 12px;
+        padding: 3px 7px;
+      }
+
+      .calendar-hint,
+      .availability-loading,
+      .slot-conflict-msg {
+        font-size: 12px;
+      }
+
+      .reserve-row {
+        flex-wrap: wrap;
+      }
+
+      .reserve-status {
+        white-space: normal;
+      }
+
+      .time-slot-btn {
+        font-size: 13px;
+        padding: 10px 12px;
+      }
+    }
+
     .time-slot-btn {
       border: 1px solid #7dd3fc;
       background: #f0fdff;
@@ -948,6 +1011,16 @@
 
     .agent-calendar .fc-daygrid-day.is-unavailable .fc-daygrid-day-number {
       color: #9dd8e4;
+    }
+
+    .agent-calendar .fc-day-disabled {
+      cursor: not-allowed;
+      opacity: .6;
+    }
+
+    .agent-calendar .fc-day-disabled .fc-daygrid-day-frame {
+      background: #f1f5f9;
+      box-shadow: none;
     }
 
     .reserve-status {
@@ -1703,6 +1776,20 @@
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
 
+      function normalizeSlotLabel(slot) {
+        const raw = String(slot || '').trim();
+        if (!raw) return '';
+        const compact = raw.replace(/\s+/g, '');
+        const matched = compact.match(/^(\d{1,2}:\d{2})[〜～~\-－—–](\d{1,2}:\d{2})$/);
+        if (!matched) return raw;
+        const pad = (hm) => {
+          const m = String(hm || '').match(/^(\d{1,2}):(\d{2})$/);
+          if (!m) return String(hm || '').trim();
+          return `${String(parseInt(m[1], 10)).padStart(2, '0')}:${m[2]}`;
+        };
+        return `${pad(matched[1])}～${pad(matched[2])}`;
+      }
+
       function getRequiredNamesForStep(stepEl) {
         const names = [];
         Array.from(stepEl.querySelectorAll('input[name], select[name]')).forEach(el => {
@@ -1792,6 +1879,7 @@
           let agentSlotCandidates = Array.isArray(agent.slotCandidates) && agent.slotCandidates.length
             ? agent.slotCandidates.slice()
             : DEFAULT_INTERVIEW_SLOTS.slice();
+          agentSlotCandidates = agentSlotCandidates.map(slot => normalizeSlotLabel(slot)).filter(Boolean);
 
           div.innerHTML = `
   <div class="agent-tag">${agent.category || '20代向け特化'}</div>
@@ -1802,7 +1890,7 @@
     ${(agent.reasons || []).map(r => `・${r}`).join('<br>')}
   </div>
 
-  <div class="reserve-row" style="display:flex; align-items:center; gap:8px;">
+  <div class="reserve-row">
     <button type="button" class="mini-link-btn">面談日程を選ぶ</button>
     <span class="reserve-status" aria-live="polite"></span>
   </div>
@@ -1870,7 +1958,10 @@
           function renderSlots(dateStr) {
             const hasDateAvailability = availabilityLoaded &&
               Object.prototype.hasOwnProperty.call(availableSlotsByDate, dateStr);
-            const availableSlots = hasDateAvailability ? (availableSlotsByDate[dateStr] || []) : agentSlotCandidates.slice();
+            const availableSlots = hasDateAvailability
+              ? (availableSlotsByDate[dateStr] || []).map(slot => normalizeSlotLabel(slot)).filter(Boolean)
+              : agentSlotCandidates.slice();
+            const availableSet = new Set(availableSlots);
             const allSlots = agentSlotCandidates.slice();
             slotGridEl.innerHTML = '';
             emptyEl.classList.add('hidden');
@@ -1884,7 +1975,7 @@
               const btn = document.createElement('button');
               btn.type = 'button';
               btn.className = 'time-slot-btn';
-              const isBooked = hasDateAvailability && availableSlots.indexOf(slot) < 0;
+              const isBooked = hasDateAvailability && !availableSet.has(slot);
               btn.textContent = isBooked ? `×${slot}` : slot;
               if (isBooked) {
                 btn.disabled = true;
@@ -2000,9 +2091,18 @@
               if (!resp.ok || !json.ok) {
                 throw new Error((json && json.error) || `status ${resp.status}`);
               }
-              availableSlotsByDate = json.available_slots_by_date || {};
+              availableSlotsByDate = {};
+              const apiAvailability = json.available_slots_by_date || {};
+              Object.keys(apiAvailability).forEach((dateKey) => {
+                const normalizedSlots = Array.isArray(apiAvailability[dateKey])
+                  ? apiAvailability[dateKey].map(slot => normalizeSlotLabel(slot)).filter(Boolean)
+                  : [];
+                availableSlotsByDate[dateKey] = normalizedSlots;
+              });
               if (Array.isArray(json.slot_candidates) && json.slot_candidates.length) {
-                agentSlotCandidates = json.slot_candidates.slice();
+                agentSlotCandidates = json.slot_candidates
+                  .map(slot => normalizeSlotLabel(slot))
+                  .filter(Boolean);
               }
               availabilityLoaded = true;
               busyDays = new Set(json.busy_days || []);
@@ -2043,6 +2143,9 @@
                 initialView: 'dayGridMonth',
                 locale: 'ja',
                 height: 'auto',
+                validRange: {
+                  start: new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate())
+                },
                 headerToolbar: {
                   left: 'prev,next',
                   center: 'title',
