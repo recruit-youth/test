@@ -418,7 +418,7 @@ function handleGetAvailability_(payload) {
 function handleReserveSlot_(payload) {
   var agentName = String(payload.agent_name || '').trim();
   var date = normalizeReservationDate_(payload.date);
-  var time = String(payload.time || '').trim();
+  var time = normalizeReservationTimeSlot_(payload.time);
   var incomingHoldToken = String(payload.hold_token || '').trim();
 
   if (!agentName || !date || !time) {
@@ -514,7 +514,7 @@ function handleUpdateReservationStatus_(payload) {
   if (!hash) {
     var agentName = String(payload.agent_name || '').trim();
     var date = normalizeReservationDate_(payload.date);
-    var time = String(payload.time || '').trim();
+    var time = normalizeReservationTimeSlot_(payload.time);
     if (!agentName || !date || !time) {
       return { ok: false, error: 'reservation_hash or (agent_name/date/time) is required' };
     }
@@ -560,7 +560,7 @@ function finalizeReservationDetails_(details, now) {
     var detail = details[i];
     var agentName = String(detail.agent_name || '').trim();
     var date = normalizeReservationDate_(detail.date);
-    var time = String(detail.time || '').trim();
+    var time = normalizeReservationTimeSlot_(detail.time);
     var hash = String(detail.reservation_hash || '').trim() || buildReservationHash_(agentName, date, time);
     var holdToken = String(detail.hold_token || '').trim();
 
@@ -633,9 +633,9 @@ function normalizeReservationDetails_(value) {
 
 function resolveSlotsForAgent_(agentName, payloadSlots) {
   var agentSlots = loadAgentSlotsByName_(agentName);
-  if (agentSlots.length) return agentSlots;
-  if (payloadSlots && payloadSlots.length) return payloadSlots;
-  return DEFAULT_TIME_SLOTS.slice();
+  if (agentSlots.length) return normalizeReservationSlotCandidates_(agentSlots);
+  if (payloadSlots && payloadSlots.length) return normalizeReservationSlotCandidates_(payloadSlots);
+  return normalizeReservationSlotCandidates_(DEFAULT_TIME_SLOTS.slice());
 }
 
 function loadAgentSlotsByName_(agentName) {
@@ -691,16 +691,17 @@ function loadReservationsForAgent_(agentName, startDate, days) {
     var rowAgent = String(row[idx.agent] || '').trim();
     var rowDate = String(row[idx.date] || '').trim();
     var rowDateNormalized = normalizeReservationDate_(rowDate);
-    var rowTime = String(row[idx.time] || '').trim();
+    var rowTime = normalizeReservationTimeSlot_(row[idx.time]);
     var rowStatus = String(row[idx.status] || '').trim();
     var rowHoldExpires = idx.holdExpires >= 0 ? String(row[idx.holdExpires] || '').trim() : '';
+    var effectiveHash = rowHash || buildReservationHash_(rowAgent, rowDateNormalized, rowTime);
 
-    if (!rowHash || !rowAgent || !rowDateNormalized || !rowTime) continue;
+    if (!effectiveHash || !rowAgent || !rowDateNormalized || !rowTime) continue;
     if (rowAgent !== agentName) continue;
     if (rowDateNormalized < startStr || rowDateNormalized > endStr) continue;
 
-    byHash[rowHash] = {
-      reservation_hash: rowHash,
+    byHash[effectiveHash] = {
+      reservation_hash: effectiveHash,
       agent_name: rowAgent,
       date: rowDateNormalized,
       time: rowTime,
@@ -726,18 +727,30 @@ function getLatestReservationByHash_(sheet, hash) {
   var headers = values[0].map(function(v) { return String(v || '').trim(); });
   var idx = getReservationHeaderIndexes_(headers);
   if (idx.hash < 0) return null;
+  var parsedHash = parseReservationHash_(hash);
+  var normalizedHash = String(hash || '').trim();
 
   var latest = null;
   for (var i = 1; i < values.length; i += 1) {
     var row = values[i];
-    if (String(row[idx.hash] || '').trim() !== hash) continue;
+    var rowHash = String(row[idx.hash] || '').trim();
+    var matched = rowHash === normalizedHash;
+    if (!matched && parsedHash && idx.agent >= 0 && idx.date >= 0 && idx.time >= 0) {
+      var rowAgent = String(row[idx.agent] || '').trim();
+      var rowDate = normalizeReservationDate_(row[idx.date]);
+      var rowTime = normalizeReservationTimeSlot_(row[idx.time]);
+      matched = rowAgent === parsedHash.agent_name &&
+        rowDate === parsedHash.date &&
+        rowTime === parsedHash.time;
+    }
+    if (!matched) continue;
 
     latest = {
       _rowNumber: i + 1,
-      reservation_hash: String(row[idx.hash] || '').trim(),
+      reservation_hash: rowHash,
       agent_name: idx.agent >= 0 ? String(row[idx.agent] || '').trim() : '',
-      date: idx.date >= 0 ? String(row[idx.date] || '').trim() : '',
-      time: idx.time >= 0 ? String(row[idx.time] || '').trim() : '',
+      date: idx.date >= 0 ? normalizeReservationDate_(row[idx.date]) : '',
+      time: idx.time >= 0 ? normalizeReservationTimeSlot_(row[idx.time]) : '',
       status: idx.status >= 0 ? String(row[idx.status] || '').trim() : '',
       hold_token: idx.holdToken >= 0 ? String(row[idx.holdToken] || '').trim() : '',
       hold_expires_at_iso: idx.holdExpires >= 0 ? String(row[idx.holdExpires] || '').trim() : '',
@@ -823,6 +836,7 @@ function ensureReservationHeaders_(sheet) {
   if (!headers.length) headers = ['更新時間'];
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
   migrateReservationDatesToSlash_(sheet, headers);
+  migrateReservationTimesToCanonical_(sheet, headers);
   return headers;
 }
 
@@ -845,6 +859,49 @@ function migrateReservationDatesToSlash_(sheet, headers) {
     if (formatted && formatted !== raw) {
       values[i][0] = formatted;
       changed = true;
+    }
+  }
+
+  if (changed) {
+    range.setValues(values);
+  }
+}
+
+function migrateReservationTimesToCanonical_(sheet, headers) {
+  var idxAgent = findHeaderIndex_(headers, ['agent_name', 'エージェント名']);
+  var idxDate = findHeaderIndex_(headers, ['date', '予約日']);
+  var idxTime = findHeaderIndex_(headers, ['time', '予約時間枠']);
+  var idxHash = findHeaderIndex_(headers, ['reservation_hash', '予約ハッシュ']);
+  if (idxTime < 0) return;
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return;
+
+  var range = sheet.getRange(2, 1, lastRow - 1, headers.length);
+  var values = range.getValues();
+  var changed = false;
+
+  for (var i = 0; i < values.length; i += 1) {
+    var row = values[i];
+    var rawTime = String(row[idxTime] || '').trim();
+    if (!rawTime) continue;
+
+    var normalizedTime = normalizeReservationTimeSlot_(rawTime);
+    if (normalizedTime && normalizedTime !== rawTime) {
+      row[idxTime] = normalizedTime;
+      changed = true;
+    }
+
+    if (idxHash >= 0 && idxAgent >= 0 && idxDate >= 0) {
+      var agentName = String(row[idxAgent] || '').trim();
+      var date = String(row[idxDate] || '').trim();
+      if (agentName && date && row[idxTime]) {
+        var normalizedHash = buildReservationHash_(agentName, date, row[idxTime]);
+        if (normalizedHash && normalizedHash !== String(row[idxHash] || '').trim()) {
+          row[idxHash] = normalizedHash;
+          changed = true;
+        }
+      }
     }
   }
 
@@ -1078,6 +1135,59 @@ function toReservationSheetDate_(value) {
   return normalized.replace(/-/g, '/');
 }
 
+function normalizeReservationTimeSlot_(value) {
+  var raw = String(value || '').trim();
+  if (!raw) return '';
+
+  var compact = raw.replace(/\s+/g, '');
+  var m = compact.match(/^(\d{1,2}:\d{2})[〜～~\-－—–](\d{1,2}:\d{2})$/);
+  if (!m) return raw;
+
+  return normalizeHourMinute_(m[1]) + '～' + normalizeHourMinute_(m[2]);
+}
+
+function normalizeHourMinute_(hm) {
+  var m = String(hm || '').match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return String(hm || '').trim();
+  var h = ('0' + parseInt(m[1], 10)).slice(-2);
+  return h + ':' + m[2];
+}
+
+function normalizeReservationSlotCandidates_(slots) {
+  var list = Array.isArray(slots) ? slots : splitMulti_(slots);
+  var seen = {};
+  var normalized = [];
+  for (var i = 0; i < list.length; i += 1) {
+    var slot = normalizeReservationTimeSlot_(list[i]);
+    if (!slot) continue;
+    if (seen[slot]) continue;
+    seen[slot] = true;
+    normalized.push(slot);
+  }
+  return normalized;
+}
+
+function parseReservationHash_(hash) {
+  var raw = String(hash || '').trim();
+  if (!raw) return null;
+  var parts = raw.split('|');
+  if (parts.length < 3) return null;
+
+  var time = parts.pop();
+  var date = parts.pop();
+  var agentName = parts.join('|');
+  agentName = String(agentName || '').trim();
+  date = normalizeReservationDate_(date);
+  time = normalizeReservationTimeSlot_(time);
+  if (!agentName || !date || !time) return null;
+
+  return {
+    agent_name: agentName,
+    date: date,
+    time: time
+  };
+}
+
 function getReservationLabelMap_() {
   return {
     reservation_hash: '予約ハッシュ',
@@ -1111,6 +1221,17 @@ function localizeReservationData_(obj) {
   var clone = Object.assign({}, obj || {});
   if (clone.date !== undefined && clone.date !== null && String(clone.date).trim()) {
     clone.date = toReservationSheetDate_(clone.date);
+  }
+  if (clone.time !== undefined && clone.time !== null && String(clone.time).trim()) {
+    clone.time = normalizeReservationTimeSlot_(clone.time);
+  }
+  if (
+    clone.agent_name !== undefined && clone.agent_name !== null &&
+    clone.date !== undefined && clone.date !== null &&
+    clone.time !== undefined && clone.time !== null
+  ) {
+    var normalizedHash = buildReservationHash_(clone.agent_name, clone.date, clone.time);
+    if (normalizedHash) clone.reservation_hash = normalizedHash;
   }
 
   ['updated_at_jst', 'booked_at_jst'].forEach(function(k) {
@@ -1281,7 +1402,8 @@ function parseAgeNumber_(ageText) {
 
 function buildReservationHash_(agentName, date, time) {
   var normalizedDate = normalizeReservationDate_(date) || String(date || '').trim();
-  return [agentName, normalizedDate, time]
+  var normalizedTime = normalizeReservationTimeSlot_(time) || String(time || '').trim();
+  return [agentName, normalizedDate, normalizedTime]
     .map(function(v) { return String(v || '').trim(); })
     .join('|');
 }
