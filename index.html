@@ -1960,22 +1960,12 @@
                   console.error('reserve_slot error:', err);
                   if (err && err.isConflict) {
                     keepDisabled = true;
-                    btn.textContent = `×${slot}`;
-
-                    const nextSlots = (availableSlotsByDate[dateStr] || []).filter(s => s !== slot);
-                    availableSlotsByDate[dateStr] = nextSlots;
-                    if (!nextSlots.length) {
-                      busyDays.add(dateStr);
-                    }
-                    markBusyDays();
-
-                    // 自動更新はせず、競合文言を出して日付選択画面へ戻す。
+                    // 競合時は空き枠を再読込して、同日を時間単位で再表示する。
                     showConflictMessage('この時間枠は先に予約が入りました。別の日程を選択してください。');
-                    timeArea.classList.add('hidden');
-                    selectedDate = null;
-                    calEl.querySelectorAll('.fc-daygrid-day.is-selected').forEach(el => {
-                      el.classList.remove('is-selected');
-                    });
+                    await loadAvailability();
+                    selectedDate = dateStr;
+                    timeArea.classList.remove('hidden');
+                    renderSlots(dateStr);
                   } else {
                     showConflictMessage('予約処理に失敗しました。通信環境をご確認のうえ再度お試しください。');
                     btn.disabled = false;
