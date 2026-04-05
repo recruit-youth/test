@@ -417,7 +417,7 @@ function handleGetAvailability_(payload) {
 
 function handleReserveSlot_(payload) {
   var agentName = String(payload.agent_name || '').trim();
-  var date = String(payload.date || '').trim();
+  var date = normalizeReservationDate_(payload.date);
   var time = String(payload.time || '').trim();
   var incomingHoldToken = String(payload.hold_token || '').trim();
 
@@ -449,7 +449,7 @@ function handleReserveSlot_(payload) {
           appendReservationEvent_(sheet, {
             reservation_hash: hash,
             agent_name: agentName,
-            date: date,
+            date: toReservationSheetDate_(date),
             time: time,
             status: RESERVATION_STATUS.HOLDING,
             hold_token: latestHoldToken,
@@ -476,7 +476,7 @@ function handleReserveSlot_(payload) {
     appendReservationEvent_(sheet, {
       reservation_hash: hash,
       agent_name: agentName,
-      date: date,
+      date: toReservationSheetDate_(date),
       time: time,
       status: RESERVATION_STATUS.HOLDING,
       hold_token: holdToken,
@@ -513,7 +513,7 @@ function handleUpdateReservationStatus_(payload) {
   var hash = String(payload.reservation_hash || '').trim();
   if (!hash) {
     var agentName = String(payload.agent_name || '').trim();
-    var date = String(payload.date || '').trim();
+    var date = normalizeReservationDate_(payload.date);
     var time = String(payload.time || '').trim();
     if (!agentName || !date || !time) {
       return { ok: false, error: 'reservation_hash or (agent_name/date/time) is required' };
@@ -535,7 +535,7 @@ function handleUpdateReservationStatus_(payload) {
     appendReservationEvent_(sheet, {
       reservation_hash: hash,
       agent_name: latest.agent_name,
-      date: latest.date,
+      date: toReservationSheetDate_(latest.date),
       time: latest.time,
       status: status,
       hold_token: '',
@@ -559,7 +559,7 @@ function finalizeReservationDetails_(details, now) {
   for (var i = 0; i < details.length; i += 1) {
     var detail = details[i];
     var agentName = String(detail.agent_name || '').trim();
-    var date = String(detail.date || '').trim();
+    var date = normalizeReservationDate_(detail.date);
     var time = String(detail.time || '').trim();
     var hash = String(detail.reservation_hash || '').trim() || buildReservationHash_(agentName, date, time);
     var holdToken = String(detail.hold_token || '').trim();
@@ -598,7 +598,7 @@ function finalizeReservationDetails_(details, now) {
     appendReservationEvent_(sheet, {
       reservation_hash: hash,
       agent_name: latest.agent_name,
-      date: latest.date,
+      date: toReservationSheetDate_(latest.date),
       time: latest.time,
       status: RESERVATION_STATUS.BOOKED,
       hold_token: latestHoldToken,
@@ -690,18 +690,19 @@ function loadReservationsForAgent_(agentName, startDate, days) {
     var rowHash = String(row[idx.hash] || '').trim();
     var rowAgent = String(row[idx.agent] || '').trim();
     var rowDate = String(row[idx.date] || '').trim();
+    var rowDateNormalized = normalizeReservationDate_(rowDate);
     var rowTime = String(row[idx.time] || '').trim();
     var rowStatus = String(row[idx.status] || '').trim();
     var rowHoldExpires = idx.holdExpires >= 0 ? String(row[idx.holdExpires] || '').trim() : '';
 
-    if (!rowHash || !rowAgent || !rowDate || !rowTime) continue;
+    if (!rowHash || !rowAgent || !rowDateNormalized || !rowTime) continue;
     if (rowAgent !== agentName) continue;
-    if (rowDate < startStr || rowDate > endStr) continue;
+    if (rowDateNormalized < startStr || rowDateNormalized > endStr) continue;
 
     byHash[rowHash] = {
       reservation_hash: rowHash,
       agent_name: rowAgent,
-      date: rowDate,
+      date: rowDateNormalized,
       time: rowTime,
       status: rowStatus,
       hold_expires_at_iso: rowHoldExpires
@@ -821,7 +822,35 @@ function ensureReservationHeaders_(sheet) {
 
   if (!headers.length) headers = ['更新時間'];
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  migrateReservationDatesToSlash_(sheet, headers);
   return headers;
+}
+
+function migrateReservationDatesToSlash_(sheet, headers) {
+  var idxDate = findHeaderIndex_(headers, ['date', '予約日']);
+  if (idxDate < 0) return;
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return;
+
+  var range = sheet.getRange(2, idxDate + 1, lastRow - 1, 1);
+  var values = range.getValues();
+  var changed = false;
+
+  for (var i = 0; i < values.length; i += 1) {
+    var raw = String(values[i][0] || '').trim();
+    if (!raw) continue;
+
+    var formatted = toReservationSheetDate_(raw);
+    if (formatted && formatted !== raw) {
+      values[i][0] = formatted;
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    range.setValues(values);
+  }
 }
 
 function getReservationHeaderIndexes_(headers) {
@@ -1025,6 +1054,30 @@ function formatJstMinute_(date) {
   return Utilities.formatDate(date, 'Asia/Tokyo', 'yyyy/MM/dd/ HH:mm');
 }
 
+function normalizeReservationDate_(value) {
+  var raw = String(value || '').trim();
+  if (!raw) return '';
+
+  var direct = raw.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+  if (direct) {
+    return [
+      direct[1],
+      ('0' + parseInt(direct[2], 10)).slice(-2),
+      ('0' + parseInt(direct[3], 10)).slice(-2)
+    ].join('-');
+  }
+
+  var parsed = new Date(raw);
+  if (String(parsed) === 'Invalid Date') return '';
+  return Utilities.formatDate(parsed, 'Asia/Tokyo', 'yyyy-MM-dd');
+}
+
+function toReservationSheetDate_(value) {
+  var normalized = normalizeReservationDate_(value);
+  if (!normalized) return String(value || '').trim();
+  return normalized.replace(/-/g, '/');
+}
+
 function getReservationLabelMap_() {
   return {
     reservation_hash: '予約ハッシュ',
@@ -1056,6 +1109,10 @@ function toReservationLabel_(key) {
 
 function localizeReservationData_(obj) {
   var clone = Object.assign({}, obj || {});
+  if (clone.date !== undefined && clone.date !== null && String(clone.date).trim()) {
+    clone.date = toReservationSheetDate_(clone.date);
+  }
+
   ['updated_at_jst', 'booked_at_jst'].forEach(function(k) {
     var v = clone[k];
     if (v) {
@@ -1223,7 +1280,8 @@ function parseAgeNumber_(ageText) {
 }
 
 function buildReservationHash_(agentName, date, time) {
-  return [agentName, date, time]
+  var normalizedDate = normalizeReservationDate_(date) || String(date || '').trim();
+  return [agentName, normalizedDate, time]
     .map(function(v) { return String(v || '').trim(); })
     .join('|');
 }
