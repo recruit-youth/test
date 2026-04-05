@@ -1776,6 +1776,28 @@
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
 
+      function scrollSelectFieldToCenter(selectEl) {
+        if (!selectEl) return;
+        const target = selectEl.closest('.field') || selectEl;
+        scrollToCenter(target);
+      }
+
+      function bindSelectAutoCentering(selectEl) {
+        if (!selectEl) return;
+        const centerSoon = () => window.setTimeout(() => scrollSelectFieldToCenter(selectEl), 60);
+        selectEl.addEventListener('focus', centerSoon);
+        selectEl.addEventListener('click', centerSoon);
+        selectEl.addEventListener('touchstart', centerSoon, { passive: true });
+        selectEl.addEventListener('change', centerSoon);
+      }
+
+      function setupDropdownAutoCentering() {
+        const ageSelect = form.querySelector('select[name="age"]');
+        const prefectureSelect = form.querySelector('#living-prefecture-select');
+        bindSelectAutoCentering(ageSelect);
+        bindSelectAutoCentering(prefectureSelect);
+      }
+
       function normalizeSlotLabel(slot) {
         const raw = String(slot || '').trim();
         if (!raw) return '';
@@ -1828,6 +1850,9 @@
             prefectureSelect.appendChild(option);
           });
           prefectureSelect.disabled = false;
+          window.setTimeout(() => {
+            scrollSelectFieldToCenter(prefectureSelect);
+          }, 80);
         };
 
         renderPrefectureOptions(regionInput.value);
@@ -2299,6 +2324,7 @@
       });
 
       setupRegionPrefectureLinkage();
+      setupDropdownAutoCentering();
       updateStep();
 
       // ★結果ページ → 診断フォームへ戻る
