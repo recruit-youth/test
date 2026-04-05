@@ -676,6 +676,30 @@
       margin-top: 6px;
     }
 
+    .line-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--accent-strong);
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .line-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1em;
+      height: 1em;
+      flex-shrink: 0;
+    }
+
+    .line-icon img {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
     /* ★② 面談予約完了画面用（追加） */
     #reserveResult {
       max-width: 720px;
@@ -1606,7 +1630,7 @@
       </p>
 
       <a href="https://lin.ee/t1YSfzmj" target="_blank" class="line-btn">
-        <span class="line-icon"><img src="https://upload.wikimedia.org/wikipedia/commons/4/41/LINE_logo.svg" alt="LINEロゴ" width="44"></span>
+        <span class="line-icon"><img src="https://upload.wikimedia.org/wikipedia/commons/4/41/LINE_logo.svg" alt="LINEロゴ"></span>
         公式LINEはこちら
       </a>
 
@@ -1798,7 +1822,7 @@
   </div>
 
   <div class="agent-calendar hidden">
-    <div class="calendar-hint">日付を選ぶと、空いている時間だけ表示されます。</div>
+    <div class="calendar-hint">日付を選ぶと、空き枠と予約済み枠（×表示）が確認できます。</div>
     <div class="availability-loading hidden">空き枠を読み込み中です…</div>
     <div class="slot-conflict-msg hidden" aria-live="polite"></div>
     <div id="calendar-${idx}"></div>
@@ -1875,7 +1899,7 @@
               btn.type = 'button';
               btn.className = 'time-slot-btn';
               const isBooked = hasDateAvailability && availableSlots.indexOf(slot) < 0;
-              btn.textContent = isBooked ? `${slot} ×` : slot;
+              btn.textContent = isBooked ? `×${slot}` : slot;
               if (isBooked) {
                 btn.disabled = true;
                 btn.classList.add('is-booked');
@@ -1950,7 +1974,7 @@
                   console.error('reserve_slot error:', err);
                   if (err && err.isConflict) {
                     keepDisabled = true;
-                    btn.textContent = '埋まりました';
+                    btn.textContent = `×${slot}`;
 
                     const nextSlots = (availableSlotsByDate[dateStr] || []).filter(s => s !== slot);
                     availableSlotsByDate[dateStr] = nextSlots;
@@ -2051,13 +2075,6 @@
                 dateClick: (info) => {
                   const dateStr = info.dateStr;
                   clearConflictMessage();
-
-                  if (busyDays.has(dateStr)) {
-                    timeArea.classList.remove('hidden');
-                    slotGridEl.innerHTML = '';
-                    emptyEl.classList.remove('hidden');
-                    return;
-                  }
 
                   calEl.querySelectorAll('.fc-daygrid-day.is-selected').forEach(el => {
                     el.classList.remove('is-selected');
