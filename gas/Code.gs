@@ -4,6 +4,8 @@ var APPLICANTS_SHEET_NAME = 'applicants';
 var RESERVATIONS_SHEET_NAME = 'reservations';
 var DEFAULT_TOP_AGENT_COUNT = 3;
 var HOLD_TTL_MINUTES = 10;
+var MONTHLY_INTERVIEW_LIMIT_PER_AGENT = 14;
+var COMPANY_SHEET_NAME_PREFIX = 'company_reservations_';
 
 var RESERVATION_STATUS = {
   HOLDING: 'holding',
@@ -44,10 +46,13 @@ function doPost(e) {
     if (action === 'update_reservation_status') {
       return jsonOutput_(handleUpdateReservationStatus_(payload));
     }
+    if (action === 'get_company_reservations') {
+      return jsonOutput_(handleGetCompanyReservations_(payload));
+    }
 
     return jsonOutput_({
       ok: false,
-      error: 'Unsupported action. Use diagnose, reserve, get_availability, reserve_slot, or update_reservation_status.'
+      error: 'Unsupported action. Use diagnose, reserve, get_availability, reserve_slot, update_reservation_status, or get_company_reservations.'
     });
   } catch (error) {
     return jsonOutput_({
@@ -328,12 +333,19 @@ function handleReserve_(payload) {
     return { ok: false, error: 'reservation_details is required' };
   }
 
+  var applicantInfo = {
+    name: String(payload.name || payload.applicant_name || '').trim(),
+    tel: String(payload.tel || payload.phone || payload.applicant_tel || '').trim(),
+    email: String(payload.email || payload.mail || payload.applicant_email || '').trim()
+  };
+
   var lock = LockService.getScriptLock();
   lock.waitLock(30000);
 
   var now = new Date();
+  var finalizeResult;
   try {
-    var finalizeResult = finalizeReservationDetails_(details, now);
+    finalizeResult = finalizeReservationDetails_(details, now, applicantInfo);
     if (!finalizeResult.ok) {
       return finalizeResult;
     }
@@ -358,7 +370,39 @@ function handleReserve_(payload) {
   return {
     ok: true,
     sheet: APPLICANTS_SHEET_NAME,
-    row: appSheet.getLastRow()
+    row: appSheet.getLastRow(),
+    reservation_results: finalizeResult.results || [],
+    calendar_sync: finalizeResult.calendar_sync || []
+  };
+}
+
+function handleGetCompanyReservations_(payload) {
+  var agentName = String(payload.agent_name || '').trim();
+  if (!agentName) return { ok: false, error: 'agent_name is required' };
+
+  var token = String(payload.company_token || payload.token || '').trim();
+  var auth = validateCompanyAccess_(agentName, token);
+  if (!auth.ok) return auth;
+
+  var records = listCompanyReservations_(agentName);
+  var statusFilter = normalizeReservationStatus_(payload.status || 'booked');
+  var filtered = records.filter(function(r) {
+    if (!statusFilter || statusFilter === 'all') return true;
+    return normalizeReservationStatus_(r.status) === statusFilter;
+  });
+
+  filtered.sort(function(a, b) {
+    var aKey = [a.date || '', a.time || ''].join(' ');
+    var bKey = [b.date || '', b.time || ''].join(' ');
+    if (aKey === bKey) return 0;
+    return aKey < bKey ? -1 : 1;
+  });
+
+  return {
+    ok: true,
+    agent_name: agentName,
+    monthly_limit: MONTHLY_INTERVIEW_LIMIT_PER_AGENT,
+    reservations: filtered
   };
 }
 
@@ -371,6 +415,7 @@ function handleGetAvailability_(payload) {
   var days = Math.max(7, Math.min(parseInt(payload.days || '31', 10) || 31, 60));
   var payloadSlots = splitMulti_(payload.slot_candidates);
   var baseSlots = resolveSlotsForAgent_(agentName, payloadSlots);
+  var reservationSheet = getOrCreateSheet_(RESERVATIONS_SHEET_NAME);
 
   var now = new Date();
   var startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -383,6 +428,28 @@ function handleGetAvailability_(payload) {
     takenByDate[r.date][r.time] = true;
   });
 
+  var calendarTakenByDate = getCalendarBusySlotsForAgent_(agentName, startDate, days, baseSlots);
+  Object.keys(calendarTakenByDate).forEach(function(dateKey) {
+    if (!takenByDate[dateKey]) takenByDate[dateKey] = {};
+    var slots = calendarTakenByDate[dateKey];
+    Object.keys(slots).forEach(function(slot) {
+      takenByDate[dateKey][slot] = true;
+    });
+  });
+
+  var monthKeys = {};
+  for (var mk = 0; mk < days; mk += 1) {
+    var mDate = new Date(startDate);
+    mDate.setDate(startDate.getDate() + mk);
+    var mDateStr = Utilities.formatDate(mDate, 'Asia/Tokyo', 'yyyy-MM-dd');
+    monthKeys[mDateStr.slice(0, 7)] = true;
+  }
+  var bookedByMonth = countBookedReservationsForAgentMonths_(
+    reservationSheet,
+    agentName,
+    Object.keys(monthKeys)
+  );
+
   var available = {};
   var busyDays = [];
 
@@ -393,6 +460,13 @@ function handleGetAvailability_(payload) {
     var weekday = d.getDay();
 
     if (weekday === 0 || weekday === 6) {
+      busyDays.push(dateStr);
+      available[dateStr] = [];
+      continue;
+    }
+
+    var monthKey = dateStr.slice(0, 7);
+    if ((bookedByMonth[monthKey] || 0) >= MONTHLY_INTERVIEW_LIMIT_PER_AGENT) {
       busyDays.push(dateStr);
       available[dateStr] = [];
       continue;
@@ -411,7 +485,9 @@ function handleGetAvailability_(payload) {
     agent_name: agentName,
     available_slots_by_date: available,
     busy_days: busyDays,
-    slot_candidates: baseSlots
+    slot_candidates: baseSlots,
+    monthly_limit: MONTHLY_INTERVIEW_LIMIT_PER_AGENT,
+    booked_count_by_month: bookedByMonth
   };
 }
 
@@ -434,6 +510,16 @@ function handleReserveSlot_(payload) {
     var latest = getLatestReservationByHash_(sheet, hash);
     var now = new Date();
     var latestRowNumber = latest ? latest._rowNumber : 0;
+    var monthKey = date.slice(0, 7);
+    var monthBooked = countBookedReservationsForAgentMonths_(sheet, agentName, [monthKey]);
+
+    if ((monthBooked[monthKey] || 0) >= MONTHLY_INTERVIEW_LIMIT_PER_AGENT) {
+      return {
+        ok: false,
+        conflict: true,
+        error: 'この会社の当月面談枠（14件）は上限に達しています。'
+      };
+    }
 
     if (latest) {
       var latestStatus = normalizeReservationStatus_(latest.status);
@@ -532,7 +618,15 @@ function handleUpdateReservationStatus_(payload) {
     }
 
     var now = new Date();
-    appendReservationEvent_(sheet, {
+    if (status === RESERVATION_STATUS.BOOKED) {
+      var monthKey = (latest.date || '').slice(0, 7);
+      var bookedByMonth = countBookedReservationsForAgentMonths_(sheet, latest.agent_name, [monthKey]);
+      if ((bookedByMonth[monthKey] || 0) >= MONTHLY_INTERVIEW_LIMIT_PER_AGENT) {
+        return { ok: false, error: 'この会社の当月面談枠（14件）は上限に達しています。' };
+      }
+    }
+
+    var rowNumber = appendReservationEvent_(sheet, {
       reservation_hash: hash,
       agent_name: latest.agent_name,
       date: toReservationSheetDate_(latest.date),
@@ -543,18 +637,27 @@ function handleUpdateReservationStatus_(payload) {
       booked_at_iso: status === RESERVATION_STATUS.BOOKED ? now.toISOString() : String(latest.booked_at_iso || '').trim(),
       booked_at_jst: status === RESERVATION_STATUS.BOOKED ? formatJstMinute_(now) : String(latest.booked_at_jst || '').trim(),
       updated_at_iso: now.toISOString(),
-      updated_at_jst: formatJstMinute_(now)
+      updated_at_jst: formatJstMinute_(now),
+      applicant_name: String(latest.applicant_name || '').trim(),
+      applicant_tel: String(latest.applicant_tel || '').trim(),
+      applicant_email: String(latest.applicant_email || '').trim(),
+      calendar_id: String(latest.calendar_id || '').trim(),
+      calendar_event_id: String(latest.calendar_event_id || '').trim(),
+      calendar_event_url: String(latest.calendar_event_url || '').trim()
     }, latest._rowNumber);
 
+    syncCalendarAndCompanyByReservationHash_(sheet, hash, rowNumber, status, now);
     return { ok: true, reservation_hash: hash, status: status };
   } finally {
     lock.releaseLock();
   }
 }
 
-function finalizeReservationDetails_(details, now) {
+function finalizeReservationDetails_(details, now, applicantInfo) {
   var sheet = getOrCreateSheet_(RESERVATIONS_SHEET_NAME);
   var results = [];
+  var calendarSync = [];
+  var monthlyBookedCache = {};
 
   for (var i = 0; i < details.length; i += 1) {
     var detail = details[i];
@@ -595,7 +698,17 @@ function finalizeReservationDetails_(details, now) {
       return { ok: false, error: '仮予約情報が不足しています。再度日程を選択してください。' };
     }
 
-    appendReservationEvent_(sheet, {
+    var monthKey = date.slice(0, 7);
+    var cacheKey = agentName + '|' + monthKey;
+    if (monthlyBookedCache[cacheKey] === undefined) {
+      var monthBooked = countBookedReservationsForAgentMonths_(sheet, agentName, [monthKey]);
+      monthlyBookedCache[cacheKey] = monthBooked[monthKey] || 0;
+    }
+    if (monthlyBookedCache[cacheKey] >= MONTHLY_INTERVIEW_LIMIT_PER_AGENT) {
+      return { ok: false, error: 'この会社の当月面談枠（14件）は上限に達しています。' };
+    }
+
+    var rowNumber = appendReservationEvent_(sheet, {
       reservation_hash: hash,
       agent_name: latest.agent_name,
       date: toReservationSheetDate_(latest.date),
@@ -606,13 +719,414 @@ function finalizeReservationDetails_(details, now) {
       booked_at_iso: now.toISOString(),
       booked_at_jst: formatJstMinute_(now),
       updated_at_iso: now.toISOString(),
-      updated_at_jst: formatJstMinute_(now)
+      updated_at_jst: formatJstMinute_(now),
+      applicant_name: applicantInfo && applicantInfo.name ? applicantInfo.name : '',
+      applicant_tel: applicantInfo && applicantInfo.tel ? applicantInfo.tel : '',
+      applicant_email: applicantInfo && applicantInfo.email ? applicantInfo.email : ''
     }, latest._rowNumber);
+    monthlyBookedCache[cacheKey] += 1;
+
+    var synced = syncCalendarAndCompanyByReservationHash_(sheet, hash, rowNumber, RESERVATION_STATUS.BOOKED, now);
+    calendarSync.push(synced);
 
     results.push({ reservation_hash: hash, status: RESERVATION_STATUS.BOOKED });
   }
 
-  return { ok: true, results: results };
+  return { ok: true, results: results, calendar_sync: calendarSync };
+}
+
+function validateCompanyAccess_(agentName, token) {
+  var config = getAgentConfigByName_(agentName);
+  if (!config) return { ok: false, error: 'agent not found' };
+
+  var requiredToken = pickString_(config, [
+    'company_token',
+    'access_token',
+    'reservation_token',
+    'api_token',
+    '企業トークン',
+    '閲覧トークン'
+  ], '');
+  if (!requiredToken) {
+    return { ok: false, error: 'company token is not configured for this agent' };
+  }
+  if (requiredToken !== String(token || '').trim()) {
+    return { ok: false, error: 'invalid company token' };
+  }
+  return { ok: true };
+}
+
+function getAgentConfigByName_(agentName) {
+  if (!agentName) return null;
+  var ctx = loadAgents_();
+  for (var i = 0; i < ctx.agents.length; i += 1) {
+    var agent = ctx.agents[i];
+    var name = pickString_(agent, ['name', 'agent', 'agent_name', '会社名', 'エージェント名'], '');
+    if (name === agentName) return agent;
+  }
+  return null;
+}
+
+function resolveAgentCalendarId_(agentName) {
+  var config = getAgentConfigByName_(agentName);
+  if (!config) return '';
+  return pickString_(config, [
+    'calendar_id',
+    'calendarid',
+    'google_calendar_id',
+    'interviewer_calendar_id',
+    '担当カレンダーid',
+    '担当者カレンダーid',
+    'カレンダーid',
+    'カレンダーID'
+  ], '');
+}
+
+function getCompanyReservationsSheet_(agentName) {
+  var config = getAgentConfigByName_(agentName) || {};
+  var spreadsheetId = pickString_(config, [
+    'company_reservations_spreadsheet_id',
+    'reservation_spreadsheet_id',
+    'company_sheet_spreadsheet_id',
+    '企業予約スプレッドシートid',
+    '企業予約スプレッドシートID'
+  ], '');
+  var preferredSheetName = pickString_(config, [
+    'company_reservations_sheet_name',
+    'reservation_sheet_name',
+    'company_sheet_name',
+    '企業予約シート名'
+  ], '');
+  var sheetName = preferredSheetName || buildCompanyReservationsSheetName_(agentName);
+
+  var ss = spreadsheetId
+    ? SpreadsheetApp.openById(spreadsheetId)
+    : SpreadsheetApp.openById(SPREADSHEET_ID);
+  return ss.getSheetByName(sheetName) || ss.insertSheet(sheetName);
+}
+
+function buildCompanyReservationsSheetName_(agentName) {
+  var safe = String(agentName || '').trim();
+  if (!safe) safe = 'default';
+  safe = safe.replace(/[\[\]\:\*\?\/\\]/g, '_').replace(/\s+/g, '_');
+  return (COMPANY_SHEET_NAME_PREFIX + safe).slice(0, 90);
+}
+
+function ensureCompanyReservationsHeaders_(sheet) {
+  var headers = [
+    '予約ハッシュ',
+    'エージェント名',
+    '予約日',
+    '予約時間枠',
+    '予約ステータス',
+    '求職者名',
+    '電話番号',
+    'メールアドレス',
+    '確定時間',
+    '更新時間',
+    'カレンダーイベントURL'
+  ];
+  var lastRow = sheet.getLastRow();
+  var lastCol = sheet.getLastColumn();
+  if (lastRow >= 1 && lastCol >= headers.length) return headers;
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  return headers;
+}
+
+function upsertCompanyReservationFromLatest_(latest) {
+  if (!latest || !latest.agent_name) return { ok: false, error: 'latest reservation is required' };
+
+  var sheet = getCompanyReservationsSheet_(latest.agent_name);
+  var headers = ensureCompanyReservationsHeaders_(sheet);
+  var idxHash = headers.indexOf('予約ハッシュ');
+  var idxDate = headers.indexOf('予約日');
+  var idxTime = headers.indexOf('予約時間枠');
+  var idxStatus = headers.indexOf('予約ステータス');
+  var idxName = headers.indexOf('求職者名');
+  var idxTel = headers.indexOf('電話番号');
+  var idxEmail = headers.indexOf('メールアドレス');
+  var idxBooked = headers.indexOf('確定時間');
+  var idxUpdated = headers.indexOf('更新時間');
+  var idxUrl = headers.indexOf('カレンダーイベントURL');
+  var idxAgent = headers.indexOf('エージェント名');
+
+  var row = [];
+  for (var i = 0; i < headers.length; i += 1) row.push('');
+  row[idxHash] = latest.reservation_hash || '';
+  row[idxAgent] = latest.agent_name || '';
+  row[idxDate] = toReservationSheetDate_(latest.date || '');
+  row[idxTime] = normalizeReservationTimeSlot_(latest.time || '');
+  row[idxStatus] = normalizeReservationStatus_(latest.status || '');
+  row[idxName] = String(latest.applicant_name || '').trim();
+  row[idxTel] = String(latest.applicant_tel || '').trim();
+  row[idxEmail] = String(latest.applicant_email || '').trim();
+  row[idxBooked] = String(latest.booked_at_jst || '').trim();
+  row[idxUpdated] = String(latest.updated_at_jst || '').trim() || formatJstMinute_(new Date());
+  row[idxUrl] = String(latest.calendar_event_url || '').trim();
+
+  var hash = String(latest.reservation_hash || '').trim();
+  if (!hash) {
+    sheet.appendRow(row);
+    return { ok: true, row: sheet.getLastRow() };
+  }
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow <= 1) {
+    sheet.appendRow(row);
+    return { ok: true, row: sheet.getLastRow() };
+  }
+
+  var hashRange = sheet.getRange(2, idxHash + 1, lastRow - 1, 1);
+  var finder = hashRange.createTextFinder(hash).matchEntireCell(true);
+  var found = finder.findNext();
+  if (found) {
+    sheet.getRange(found.getRow(), 1, 1, headers.length).setValues([row]);
+    return { ok: true, row: found.getRow() };
+  }
+
+  sheet.appendRow(row);
+  return { ok: true, row: sheet.getLastRow() };
+}
+
+function listCompanyReservations_(agentName) {
+  var sheet = getCompanyReservationsSheet_(agentName);
+  var headers = ensureCompanyReservationsHeaders_(sheet);
+  var lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return [];
+
+  var values = sheet.getRange(2, 1, lastRow - 1, headers.length).getValues();
+  var idxHash = headers.indexOf('予約ハッシュ');
+  var idxDate = headers.indexOf('予約日');
+  var idxTime = headers.indexOf('予約時間枠');
+  var idxStatus = headers.indexOf('予約ステータス');
+  var idxName = headers.indexOf('求職者名');
+  var idxTel = headers.indexOf('電話番号');
+  var idxEmail = headers.indexOf('メールアドレス');
+  var idxBooked = headers.indexOf('確定時間');
+  var idxUpdated = headers.indexOf('更新時間');
+  var idxUrl = headers.indexOf('カレンダーイベントURL');
+
+  var rows = [];
+  for (var i = 0; i < values.length; i += 1) {
+    var row = values[i];
+    if (!String(row[idxHash] || '').trim()) continue;
+    rows.push({
+      reservation_hash: String(row[idxHash] || '').trim(),
+      date: normalizeReservationDate_(row[idxDate]) || String(row[idxDate] || '').trim(),
+      time: normalizeReservationTimeSlot_(row[idxTime]),
+      status: normalizeReservationStatus_(row[idxStatus]),
+      applicant_name: String(row[idxName] || '').trim(),
+      applicant_tel: String(row[idxTel] || '').trim(),
+      applicant_email: String(row[idxEmail] || '').trim(),
+      booked_at_jst: String(row[idxBooked] || '').trim(),
+      updated_at_jst: String(row[idxUpdated] || '').trim(),
+      calendar_event_url: String(row[idxUrl] || '').trim()
+    });
+  }
+  return rows;
+}
+
+function countBookedReservationsForAgentMonths_(sheet, agentName, monthKeys) {
+  var counts = {};
+  (monthKeys || []).forEach(function(m) { counts[m] = 0; });
+  if (!monthKeys || !monthKeys.length || !agentName) return counts;
+
+  ensureReservationHeaders_(sheet);
+  var lastRow = sheet.getLastRow();
+  var lastCol = sheet.getLastColumn();
+  if (lastRow <= 1 || lastCol <= 0) return counts;
+
+  var values = sheet.getRange(1, 1, lastRow, lastCol).getValues();
+  var headers = values[0].map(function(v) { return String(v || '').trim(); });
+  var idx = getReservationHeaderIndexes_(headers);
+  if (idx.agent < 0 || idx.date < 0 || idx.status < 0) return counts;
+
+  var targetMonths = {};
+  monthKeys.forEach(function(m) { targetMonths[m] = true; });
+  var byHash = {};
+  for (var i = 1; i < values.length; i += 1) {
+    var row = values[i];
+    var rowAgent = String(row[idx.agent] || '').trim();
+    if (rowAgent !== agentName) continue;
+
+    var rowDate = normalizeReservationDate_(row[idx.date]);
+    if (!rowDate) continue;
+    var monthKey = rowDate.slice(0, 7);
+    if (!targetMonths[monthKey]) continue;
+
+    var rowHash = idx.hash >= 0 ? String(row[idx.hash] || '').trim() : '';
+    if (!rowHash && idx.time >= 0) {
+      rowHash = buildReservationHash_(rowAgent, rowDate, row[idx.time]);
+    }
+    if (!rowHash) rowHash = 'row_' + i;
+
+    byHash[rowHash] = {
+      status: normalizeReservationStatus_(row[idx.status]),
+      month: monthKey
+    };
+  }
+
+  Object.keys(byHash).forEach(function(hash) {
+    var item = byHash[hash];
+    if (item.status === RESERVATION_STATUS.BOOKED) {
+      counts[item.month] = (counts[item.month] || 0) + 1;
+    }
+  });
+  return counts;
+}
+
+function parseTimeSlotRange_(dateStr, slot) {
+  var normalizedDate = normalizeReservationDate_(dateStr);
+  var normalizedSlot = normalizeReservationTimeSlot_(slot);
+  var m = normalizedSlot.match(/^(\d{2}):(\d{2})～(\d{2}):(\d{2})$/);
+  if (!normalizedDate || !m) return null;
+
+  var d = normalizedDate.split('-');
+  var y = parseInt(d[0], 10);
+  var mo = parseInt(d[1], 10) - 1;
+  var day = parseInt(d[2], 10);
+  var start = new Date(y, mo, day, parseInt(m[1], 10), parseInt(m[2], 10), 0, 0);
+  var end = new Date(y, mo, day, parseInt(m[3], 10), parseInt(m[4], 10), 0, 0);
+  if (end.getTime() <= start.getTime()) return null;
+  return { start: start, end: end };
+}
+
+function rangesOverlap_(startA, endA, startB, endB) {
+  if (!startA || !endA || !startB || !endB) return false;
+  return startA.getTime() < endB.getTime() && startB.getTime() < endA.getTime();
+}
+
+function getCalendarBusySlotsForAgent_(agentName, startDate, days, slots) {
+  var calendarId = resolveAgentCalendarId_(agentName);
+  if (!calendarId) return {};
+
+  var calendar = CalendarApp.getCalendarById(calendarId);
+  if (!calendar) return {};
+
+  var start = new Date(startDate);
+  var end = new Date(startDate);
+  end.setDate(startDate.getDate() + days);
+  var events = calendar.getEvents(start, end);
+  if (!events.length) return {};
+
+  var busy = {};
+  for (var i = 0; i < days; i += 1) {
+    var current = new Date(startDate);
+    current.setDate(startDate.getDate() + i);
+    var dateStr = Utilities.formatDate(current, 'Asia/Tokyo', 'yyyy-MM-dd');
+    var busySlots = {};
+    for (var j = 0; j < slots.length; j += 1) {
+      var slot = normalizeReservationTimeSlot_(slots[j]);
+      var slotRange = parseTimeSlotRange_(dateStr, slot);
+      if (!slotRange) continue;
+      for (var k = 0; k < events.length; k += 1) {
+        var event = events[k];
+        if (rangesOverlap_(slotRange.start, slotRange.end, event.getStartTime(), event.getEndTime())) {
+          busySlots[slot] = true;
+          break;
+        }
+      }
+    }
+    if (Object.keys(busySlots).length) busy[dateStr] = busySlots;
+  }
+  return busy;
+}
+
+function syncReservationCalendar_(sheet, latest, nextStatus, rowNumber, now) {
+  var status = normalizeReservationStatus_(nextStatus || latest.status);
+  var calendarId = String(latest.calendar_id || '').trim() || resolveAgentCalendarId_(latest.agent_name);
+  var existingEventId = String(latest.calendar_event_id || '').trim();
+  var targetRow = rowNumber || latest._rowNumber;
+
+  if (!calendarId) {
+    return { ok: false, skipped: true, reason: 'calendar_id is not configured' };
+  }
+
+  var calendar = CalendarApp.getCalendarById(calendarId);
+  if (!calendar) {
+    return { ok: false, skipped: true, reason: 'calendar not found: ' + calendarId };
+  }
+
+  if (status === RESERVATION_STATUS.CANCELED && existingEventId) {
+    try {
+      var targetEvent = calendar.getEventById(existingEventId);
+      if (targetEvent) targetEvent.deleteEvent();
+    } catch (cancelErr) {
+      // Continue and clear linkage fields anyway.
+    }
+    appendReservationEvent_(sheet, {
+      reservation_hash: latest.reservation_hash,
+      agent_name: latest.agent_name,
+      date: latest.date,
+      time: latest.time,
+      status: status,
+      calendar_id: calendarId,
+      calendar_event_id: '',
+      calendar_event_url: '',
+      updated_at_iso: now.toISOString(),
+      updated_at_jst: formatJstMinute_(now)
+    }, targetRow);
+    return { ok: true, deleted: true };
+  }
+
+  if (status !== RESERVATION_STATUS.BOOKED) {
+    return { ok: true, skipped: true, reason: 'status is not booked' };
+  }
+  if (existingEventId) {
+    return { ok: true, skipped: true, reason: 'event already linked', event_id: existingEventId };
+  }
+
+  var range = parseTimeSlotRange_(latest.date, latest.time);
+  if (!range) return { ok: false, skipped: true, reason: 'invalid date/time slot' };
+
+  var applicantName = String(latest.applicant_name || '').trim() || '求職者';
+  var title = '【面談予約】' + applicantName + ' 様';
+  var lines = [
+    '予約ハッシュ: ' + String(latest.reservation_hash || ''),
+    'エージェント: ' + String(latest.agent_name || ''),
+    '氏名: ' + applicantName,
+    '電話番号: ' + String(latest.applicant_tel || '').trim(),
+    'メール: ' + String(latest.applicant_email || '').trim()
+  ];
+  var event = calendar.createEvent(title, range.start, range.end, {
+    description: lines.join('\n')
+  });
+  appendReservationEvent_(sheet, {
+    reservation_hash: latest.reservation_hash,
+    agent_name: latest.agent_name,
+    date: latest.date,
+    time: latest.time,
+    status: status,
+    calendar_id: calendarId,
+    calendar_event_id: event.getId(),
+    calendar_event_url: event.getHtmlLink(),
+    updated_at_iso: now.toISOString(),
+    updated_at_jst: formatJstMinute_(now)
+  }, targetRow);
+  return {
+    ok: true,
+    event_id: event.getId(),
+    event_url: event.getHtmlLink(),
+    calendar_id: calendarId
+  };
+}
+
+function syncCalendarAndCompanyByReservationHash_(sheet, hash, rowNumber, nextStatus, now) {
+  var latest = getLatestReservationByHash_(sheet, hash);
+  if (!latest) {
+    return { ok: false, reservation_hash: hash, error: 'reservation not found after update' };
+  }
+
+  var calendarSync = syncReservationCalendar_(sheet, latest, nextStatus, rowNumber, now);
+  var newest = getLatestReservationByHash_(sheet, hash) || latest;
+  var companySync = upsertCompanyReservationFromLatest_(newest);
+
+  return {
+    ok: true,
+    reservation_hash: hash,
+    calendar: calendarSync,
+    company: companySync
+  };
 }
 
 function normalizeReservationDetails_(value) {
@@ -757,7 +1271,13 @@ function getLatestReservationByHash_(sheet, hash) {
       booked_at_iso: idx.bookedIso >= 0 ? String(row[idx.bookedIso] || '').trim() : '',
       booked_at_jst: idx.bookedJst >= 0 ? String(row[idx.bookedJst] || '').trim() : '',
       updated_at_iso: idx.updatedIso >= 0 ? String(row[idx.updatedIso] || '').trim() : '',
-      updated_at_jst: idx.updatedJst >= 0 ? String(row[idx.updatedJst] || '').trim() : ''
+      updated_at_jst: idx.updatedJst >= 0 ? String(row[idx.updatedJst] || '').trim() : '',
+      applicant_name: idx.applicantName >= 0 ? String(row[idx.applicantName] || '').trim() : '',
+      applicant_tel: idx.applicantTel >= 0 ? String(row[idx.applicantTel] || '').trim() : '',
+      applicant_email: idx.applicantEmail >= 0 ? String(row[idx.applicantEmail] || '').trim() : '',
+      calendar_id: idx.calendarId >= 0 ? String(row[idx.calendarId] || '').trim() : '',
+      calendar_event_id: idx.calendarEventId >= 0 ? String(row[idx.calendarEventId] || '').trim() : '',
+      calendar_event_url: idx.calendarEventUrl >= 0 ? String(row[idx.calendarEventUrl] || '').trim() : ''
     };
   }
 
@@ -922,7 +1442,13 @@ function getReservationHeaderIndexes_(headers) {
     bookedIso: findHeaderIndex_(headers, ['booked_at_iso', '確定時間ISO']),
     bookedJst: findHeaderIndex_(headers, ['booked_at_jst', '確定時間']),
     updatedIso: findHeaderIndex_(headers, ['updated_at_iso', '更新時間ISO']),
-    updatedJst: findHeaderIndex_(headers, ['updated_at_jst', '更新時間'])
+    updatedJst: findHeaderIndex_(headers, ['updated_at_jst', '更新時間']),
+    applicantName: findHeaderIndex_(headers, ['applicant_name', '予約者名']),
+    applicantTel: findHeaderIndex_(headers, ['applicant_tel', '予約者電話番号']),
+    applicantEmail: findHeaderIndex_(headers, ['applicant_email', '予約者メールアドレス']),
+    calendarId: findHeaderIndex_(headers, ['calendar_id', '連携カレンダーID']),
+    calendarEventId: findHeaderIndex_(headers, ['calendar_event_id', 'カレンダーイベントID']),
+    calendarEventUrl: findHeaderIndex_(headers, ['calendar_event_url', 'カレンダーイベントURL'])
   };
 }
 
@@ -1200,7 +1726,13 @@ function getReservationLabelMap_() {
     booked_at_iso: '確定時間ISO',
     booked_at_jst: '確定時間',
     updated_at_iso: '更新時間ISO',
-    updated_at_jst: '更新時間'
+    updated_at_jst: '更新時間',
+    applicant_name: '予約者名',
+    applicant_tel: '予約者電話番号',
+    applicant_email: '予約者メールアドレス',
+    calendar_id: '連携カレンダーID',
+    calendar_event_id: 'カレンダーイベントID',
+    calendar_event_url: 'カレンダーイベントURL'
   };
 }
 
