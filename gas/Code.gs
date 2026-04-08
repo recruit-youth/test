@@ -558,6 +558,14 @@ function handleReserveSlot_(payload) {
       };
     }
 
+    if (isSlotBlockedByCalendar_(agentName, date, time, '')) {
+      return {
+        ok: false,
+        conflict: true,
+        error: '担当者の予定と重複しているため、この時間は予約できません。'
+      };
+    }
+
     if (latest) {
       var latestStatus = normalizeReservationStatus_(latest.status);
       var latestHoldToken = String(latest.hold_token || '').trim();
@@ -661,6 +669,9 @@ function handleUpdateReservationStatus_(payload) {
       if ((bookedByMonth[monthKey] || 0) >= MONTHLY_INTERVIEW_LIMIT_PER_AGENT) {
         return { ok: false, error: 'この会社の当月面談枠（14件）は上限に達しています。' };
       }
+      if (isSlotBlockedByCalendar_(latest.agent_name, latest.date, latest.time, latest.calendar_event_id || '')) {
+        return { ok: false, error: '担当者の予定と重複しているため、この時間は予約できません。' };
+      }
     }
 
     var rowNumber = appendReservationEvent_(sheet, {
@@ -743,6 +754,9 @@ function finalizeReservationDetails_(details, now, applicantInfo) {
     }
     if (monthlyBookedCache[cacheKey] >= MONTHLY_INTERVIEW_LIMIT_PER_AGENT) {
       return { ok: false, error: 'この会社の当月面談枠（14件）は上限に達しています。' };
+    }
+    if (isSlotBlockedByCalendar_(agentName, date, time, latest.calendar_event_id || '')) {
+      return { ok: false, error: '担当者の予定と重複しているため、この時間は予約できません。' };
     }
 
     var rowNumber = appendReservationEvent_(sheet, {
@@ -1067,6 +1081,28 @@ function getCalendarBusySlotsForAgent_(agentName, startDate, days, slots) {
     if (Object.keys(busySlots).length) busy[dateStr] = busySlots;
   }
   return busy;
+}
+
+function isSlotBlockedByCalendar_(agentName, dateStr, slot, ignoreEventId) {
+  var calendarId = resolveAgentCalendarId_(agentName);
+  if (!calendarId) return false;
+
+  var calendar = CalendarApp.getCalendarById(calendarId);
+  if (!calendar) return false;
+
+  var range = parseTimeSlotRange_(dateStr, slot);
+  if (!range) return false;
+
+  var events = calendar.getEvents(range.start, range.end);
+  var ignoredId = String(ignoreEventId || '').trim();
+  for (var i = 0; i < events.length; i += 1) {
+    var event = events[i];
+    if (ignoredId && String(event.getId() || '').trim() === ignoredId) continue;
+    if (rangesOverlap_(range.start, range.end, event.getStartTime(), event.getEndTime())) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function syncReservationCalendar_(sheet, latest, nextStatus, rowNumber, now) {
