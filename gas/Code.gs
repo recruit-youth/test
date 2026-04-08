@@ -6,6 +6,9 @@ var DEFAULT_TOP_AGENT_COUNT = 3;
 var HOLD_TTL_MINUTES = 10;
 var MONTHLY_INTERVIEW_LIMIT_PER_AGENT = 14;
 var COMPANY_SHEET_NAME_PREFIX = 'company_reservations_';
+var reservationMigrationsDone_ = false;
+var reservationHeadersCache_ = null;
+var RESERVATION_SCHEMA_MIGRATION_FLAG = 'reservations_schema_v2_done';
 
 var RESERVATION_STATUS = {
   HOLDING: 'holding',
@@ -25,6 +28,16 @@ var DEFAULT_TIME_SLOTS = [
   '16:00～17:00',
   '17:00～18:00'
 ];
+
+function shouldSkipHeavyMigrations_() {
+  var props = PropertiesService.getScriptProperties();
+  return String(props.getProperty(RESERVATION_SCHEMA_MIGRATION_FLAG) || '').trim() === '1';
+}
+
+function markHeavyMigrationsDone_() {
+  var props = PropertiesService.getScriptProperties();
+  props.setProperty(RESERVATION_SCHEMA_MIGRATION_FLAG, '1');
+}
 
 function doPost(e) {
   try {
@@ -547,24 +560,6 @@ function handleReserveSlot_(payload) {
     var latest = getLatestReservationByHash_(sheet, hash);
     var now = new Date();
     var latestRowNumber = latest ? latest._rowNumber : 0;
-    var monthKey = date.slice(0, 7);
-    var monthBooked = countBookedReservationsForAgentMonths_(sheet, agentName, [monthKey]);
-
-    if ((monthBooked[monthKey] || 0) >= MONTHLY_INTERVIEW_LIMIT_PER_AGENT) {
-      return {
-        ok: false,
-        conflict: true,
-        error: 'この会社の当月面談枠（14件）は上限に達しています。'
-      };
-    }
-
-    if (isSlotBlockedByCalendar_(agentName, date, time, '')) {
-      return {
-        ok: false,
-        conflict: true,
-        error: '担当者の予定と重複しているため、この時間は予約できません。'
-      };
-    }
 
     if (latest) {
       var latestStatus = normalizeReservationStatus_(latest.status);
@@ -1185,13 +1180,16 @@ function syncReservationCalendar_(sheet, latest, nextStatus, rowNumber, now) {
 }
 
 function syncCalendarAndCompanyByReservationHash_(sheet, hash, rowNumber, nextStatus, now) {
-  var latest = getLatestReservationByHash_(sheet, hash);
+  var latest = rowNumber ? getReservationByRowNumber_(sheet, rowNumber) : null;
+  if (!latest && hash) latest = getLatestReservationByHash_(sheet, hash);
   if (!latest) {
     return { ok: false, reservation_hash: hash, error: 'reservation not found after update' };
   }
 
   var calendarSync = syncReservationCalendar_(sheet, latest, nextStatus, rowNumber, now);
-  var newest = getLatestReservationByHash_(sheet, hash) || latest;
+  var newest = rowNumber ? getReservationByRowNumber_(sheet, rowNumber) : null;
+  if (!newest && hash) newest = getLatestReservationByHash_(sheet, hash);
+  newest = newest || latest;
   var companySync = upsertCompanyReservationFromLatest_(newest);
 
   return {
@@ -1199,6 +1197,41 @@ function syncCalendarAndCompanyByReservationHash_(sheet, hash, rowNumber, nextSt
     reservation_hash: hash,
     calendar: calendarSync,
     company: companySync
+  };
+}
+
+function getReservationByRowNumber_(sheet, rowNumber) {
+  ensureReservationHeaders_(sheet);
+  var targetRow = parseInt(rowNumber || 0, 10);
+  var lastRow = sheet.getLastRow();
+  var lastCol = sheet.getLastColumn();
+  if (isNaN(targetRow) || targetRow <= 1 || targetRow > lastRow || lastCol <= 0) return null;
+
+  var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0]
+    .map(function(v) { return String(v || '').trim(); });
+  var idx = getReservationHeaderIndexes_(headers);
+  var row = sheet.getRange(targetRow, 1, 1, lastCol).getValues()[0];
+  if (!row || !row.length) return null;
+
+  return {
+    _rowNumber: targetRow,
+    reservation_hash: idx.hash >= 0 ? String(row[idx.hash] || '').trim() : '',
+    agent_name: idx.agent >= 0 ? String(row[idx.agent] || '').trim() : '',
+    date: idx.date >= 0 ? normalizeReservationDate_(row[idx.date]) : '',
+    time: idx.time >= 0 ? normalizeReservationTimeSlot_(row[idx.time]) : '',
+    status: idx.status >= 0 ? String(row[idx.status] || '').trim() : '',
+    hold_token: idx.holdToken >= 0 ? String(row[idx.holdToken] || '').trim() : '',
+    hold_expires_at_iso: idx.holdExpires >= 0 ? String(row[idx.holdExpires] || '').trim() : '',
+    booked_at_iso: idx.bookedIso >= 0 ? String(row[idx.bookedIso] || '').trim() : '',
+    booked_at_jst: idx.bookedJst >= 0 ? String(row[idx.bookedJst] || '').trim() : '',
+    updated_at_iso: idx.updatedIso >= 0 ? String(row[idx.updatedIso] || '').trim() : '',
+    updated_at_jst: idx.updatedJst >= 0 ? String(row[idx.updatedJst] || '').trim() : '',
+    applicant_name: idx.applicantName >= 0 ? String(row[idx.applicantName] || '').trim() : '',
+    applicant_tel: idx.applicantTel >= 0 ? String(row[idx.applicantTel] || '').trim() : '',
+    applicant_email: idx.applicantEmail >= 0 ? String(row[idx.applicantEmail] || '').trim() : '',
+    calendar_id: idx.calendarId >= 0 ? String(row[idx.calendarId] || '').trim() : '',
+    calendar_event_id: idx.calendarEventId >= 0 ? String(row[idx.calendarEventId] || '').trim() : '',
+    calendar_event_url: idx.calendarEventUrl >= 0 ? String(row[idx.calendarEventUrl] || '').trim() : ''
   };
 }
 
@@ -1370,6 +1403,10 @@ function appendReservationEvent_(sheet, obj, rowNumber) {
 
   if (changed) {
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    reservationHeadersCache_ = {
+      sheetId: sheet.getSheetId(),
+      headers: headers.slice()
+    };
   }
 
   var row = [];
@@ -1397,6 +1434,11 @@ function appendReservationEvent_(sheet, obj, rowNumber) {
 }
 
 function ensureReservationHeaders_(sheet) {
+  var cached = reservationHeadersCache_;
+  if (cached && cached.sheetId === sheet.getSheetId() && cached.headers && cached.headers.length) {
+    return cached.headers.slice();
+  }
+
   migrateReservationsHeadersToJapanese_(sheet);
 
   var headers = [];
@@ -1428,8 +1470,26 @@ function ensureReservationHeaders_(sheet) {
 
   if (!headers.length) headers = ['更新時間'];
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-  migrateReservationDatesToSlash_(sheet, headers);
-  migrateReservationTimesToCanonical_(sheet, headers);
+
+  if (!reservationMigrationsDone_) {
+    var skipHeavy = shouldSkipHeavyMigrations_();
+    if (!skipHeavy) {
+      migrateReservationDatesToSlash_(sheet, headers);
+      migrateReservationTimesToCanonical_(sheet, headers);
+      markHeavyMigrationsDone_();
+    }
+    reservationMigrationsDone_ = true;
+  }
+
+  if (!shouldSkipHeavyMigrations_()) {
+    migrateReservationDatesToSlash_(sheet, headers);
+    migrateReservationTimesToCanonical_(sheet, headers);
+  }
+
+  reservationHeadersCache_ = {
+    sheetId: sheet.getSheetId(),
+    headers: headers.slice()
+  };
   return headers;
 }
 

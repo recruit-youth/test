@@ -243,6 +243,13 @@
       border-radius: var(--radius-lg);
       box-shadow: var(--shadow);
       padding: 20px 20px 16px;
+      transition: transform .22s ease, box-shadow .22s ease;
+      will-change: transform;
+    }
+
+    .card:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 22px 44px rgba(15, 23, 42, 0.24);
     }
 
     .left-copy h1 {
@@ -316,11 +323,15 @@
 
     .step {
       display: none;
-      animation: fadeIn .18s ease-out;
+      animation: fadeIn .26s ease-out;
     }
 
     .step.active {
       display: block;
+    }
+
+    .step.is-focus {
+      animation: stepPop .34s ease-out;
     }
 
     @keyframes fadeIn {
@@ -332,6 +343,17 @@
       to {
         opacity: 1;
         transform: translateY(0);
+      }
+    }
+
+    @keyframes stepPop {
+      0% {
+        transform: translateY(10px) scale(.992);
+        opacity: .88;
+      }
+      100% {
+        transform: translateY(0) scale(1);
+        opacity: 1;
       }
     }
 
@@ -467,6 +489,32 @@
       background: linear-gradient(90deg, var(--accent-grad-from), var(--accent-grad-to));
       color: #fff;
       box-shadow: 0 10px 25px var(--accent-shadow);
+    }
+
+    .btn,
+    .btn-primary,
+    .mini-link-btn,
+    .time-slot-btn,
+    .pill,
+    select,
+    input[type="text"],
+    input[type="email"],
+    input[type="tel"] {
+      transition: transform .14s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
+    }
+
+    .btn-primary:hover:not(:disabled),
+    .mini-link-btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 14px 30px rgba(8, 145, 178, .28);
+    }
+
+    select:focus,
+    input[type="text"]:focus,
+    input[type="email"]:focus,
+    input[type="tel"]:focus {
+      transform: translateY(-1px);
+      box-shadow: 0 0 0 2px rgba(125, 211, 252, .35);
     }
 
     .btn-primary:hover:not(:disabled) {
@@ -2293,7 +2341,12 @@
           updateStep();
           const nextStepEl = steps[currentStep];
           if (nextStepEl) {
-            scrollToCenter(nextStepEl);
+            nextStepEl.classList.remove('is-focus');
+            void nextStepEl.offsetWidth;
+            nextStepEl.classList.add('is-focus');
+            const firstField = nextStepEl.querySelector('.field');
+            scrollToCenter(firstField || nextStepEl);
+            window.setTimeout(() => nextStepEl.classList.remove('is-focus'), 420);
           } else {
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }
