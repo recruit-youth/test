@@ -127,6 +127,7 @@ function handleDiagnose_(payload) {
 
 function loadAgents_() {
   var sheet = getSheet_(AGENTS_SHEET_NAME);
+  ensureAgentOperationHeaders_(sheet);
   var values = sheet.getDataRange().getValues();
   if (values.length <= 1) {
     return {
@@ -166,6 +167,42 @@ function loadAgents_() {
     rawHeaders: rawHeaders,
     agents: rows
   };
+}
+
+function ensureAgentOperationHeaders_(sheet) {
+  if (!sheet) return;
+  var required = [
+    'calendar_id',
+    'company_token',
+    'company_reservations_spreadsheet_id',
+    'company_reservations_sheet_name'
+  ];
+
+  var lastRow = sheet.getLastRow();
+  var lastCol = sheet.getLastColumn();
+  var headers = [];
+  if (lastRow > 0 && lastCol > 0) {
+    headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0]
+      .map(function(v) { return String(v || '').trim(); });
+  }
+
+  var normalizedExisting = {};
+  headers.forEach(function(h) {
+    if (!h) return;
+    normalizedExisting[normalizeHeader_(h)] = true;
+  });
+
+  var changed = false;
+  required.forEach(function(col) {
+    if (!normalizedExisting[normalizeHeader_(col)]) {
+      headers.push(col);
+      changed = true;
+    }
+  });
+
+  if (!changed) return;
+  if (!headers.length) headers = required.slice();
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
 }
 
 function isAgentEnabled_(agent) {
