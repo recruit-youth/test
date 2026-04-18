@@ -68,3 +68,30 @@ npm run dev
 - `COMP_*_CALENDAR_ID` / `COMP_*_SHEET_ID`
 - `SMTP_*`
 - `LINE_REGISTRATION_URL`
+
+## WordPress貼り付け版（同等フロー）
+
+`wordpress/jobflow-matching-plugin.php` を追加しています。  
+このプラグインを有効化すると、WordPress内で以下を同等フローで実行できます。
+
+- 求職者質問 -> 3社提案 -> 日程調整 -> 予約完了 -> LINE遷移
+- 会社ごとの月14件制限
+- 予約一覧API（求職者/会社）
+
+### 導入手順
+
+1. `wp-content/plugins/jobflow-matching-plugin/jobflow-matching-plugin.php` として配置
+2. 管理画面でプラグインを有効化
+3. 固定ページ本文にショートコード `[jobflow_app]` を貼り付け
+4. 「Jobflow設定」メニューで LINE 登録URL を設定
+
+### WordPress版の連携拡張
+
+Google Calendar / Google Sheets 連携は、プラグイン内のフックで拡張可能です。
+
+- `jobflow_google_busy_ranges`
+- `jobflow_google_slot_is_free`
+- `jobflow_google_create_event`
+- `jobflow_append_to_sheet`
+
+メール通知は `wp_mail` で実行します。必要に応じて `jobflow_should_send_mail` フィルタで制御できます。
