@@ -1,0 +1,27 @@
+{
+  "name": "job-seeker-matching-site",
+  "version": "1.0.0",
+  "description": "Job seeker questionnaire, company matching, and scheduling flow",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "keywords": [
+    "job-matching",
+    "scheduler",
+    "google-calendar",
+    "google-sheets"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "better-sqlite3": "^12.4.1",
+    "dayjs": "^1.11.18",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "googleapis": "^169.0.0",
+    "nodemailer": "^7.0.10",
+    "uuid": "^13.0.0"
+  }
+}
