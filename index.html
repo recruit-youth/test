@@ -1788,8 +1788,12 @@
       const agentGrid = document.getElementById('agent-grid');
       const form = document.getElementById('diagnosis-form');
 
-      // ★ここを「ウェブアプリとしてデプロイした /exec のURL」に差し替える
-      const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwdGfYyqGYi-OGMlywH4wSlzuzoM2dC6y_nUUWsbjWZwSPgBBmZtgbf9OFYmIILTXejxg/exec';
+      // WordPress REST API を優先し、未設定時のみ GAS URL を利用
+      const WEB_APP_URL =
+        window.WP_BOOKING_API_URL ||
+        window.YOUTHJOB_API_URL ||
+        window.WEB_APP_URL ||
+        'https://script.google.com/macros/s/AKfycbwdGfYyqGYi-OGMlywH4wSlzuzoM2dC6y_nUUWsbjWZwSPgBBmZtgbf9OFYmIILTXejxg/exec';
       window.WEB_APP_URL = WEB_APP_URL;
 
       let currentStep = 0;

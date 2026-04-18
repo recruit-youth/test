@@ -32,3 +32,46 @@
 - 予約調整時:
   - 企業担当者カレンダーの既存予定を空き枠計算に反映
   - `reservations` シートはリクエスト内で1回だけ読み取り、メモリ上のインデックスで空き枠判定・月間上限判定・最新予約参照を行うため、予約処理の体感速度を改善
+
+## WordPress 無料構成（推奨: 高速化）
+
+GAS/スプレッドシート構成で遅延が気になる場合、WordPress の MySQL を使う構成に切り替えると予約処理が高速化しやすくなります。
+
+### 追加ファイル
+
+- `wordpress/youthjob-booking-api/youthjob-booking-api.php`
+  - WordPress プラグイン
+  - 既存フロントの `action` 形式に合わせた API を提供
+  - DB テーブル（応募/予約/企業設定）を自動作成
+  - 企業分離、月間14件上限、Google Calendar 連携（空き確認/作成/削除）対応
+
+### 導入手順
+
+1. WordPress サーバーにプラグインを配置  
+   `wp-content/plugins/youthjob-booking-api/youthjob-booking-api.php`
+2. WordPress 管理画面でプラグインを有効化
+3. 管理画面メニュー `YouthJob Booking API` を開く
+4. （Google Calendar連携する場合）Service Account JSON を設定して保存
+5. 会社設定（agent_name / token / calendar_id / slot_candidates）を登録
+6. フロント側 API URL を WordPress REST に設定
+
+### フロント API 設定
+
+`index.html` は次の優先順で API URL を決定します:
+
+1. `window.WP_BOOKING_API_URL`（WordPress側でグローバル注入した場合）
+2. `window.WEB_APP_URL`（既存互換）
+3. `const WP_BOOKING_API_URL`（ファイル内定数）
+4. `const GAS_WEB_APP_URL`（フォールバック）
+
+既定値:
+
+- `WP_BOOKING_API_URL`: `https://example.com/wp-json/youthjob/v1/booking`（差し替え）
+- `GAS_WEB_APP_URL`: 既存 Apps Script URL
+
+### REST エンドポイント
+
+- `POST /wp-json/youthjob/v1/booking`
+  - `action`: `diagnose` / `get_availability` / `reserve_slot` / `reserve` / `update_reservation_status`
+- `POST /wp-json/youthjob/v1/company-reservations`
+  - `agent_name` + `company_token` で自社予約のみ取得
