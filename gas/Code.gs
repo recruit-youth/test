@@ -392,10 +392,14 @@ function handleReserve_(payload) {
   var lock = LockService.getScriptLock();
   lock.waitLock(30000);
 
+  var reservationSheet = getOrCreateSheet_(RESERVATIONS_SHEET_NAME);
+  var reservationHeaders = ensureReservationHeaders_(reservationSheet);
+  var reservationIndex = buildReservationLookupIndex_(reservationSheet, reservationHeaders);
+
   var now = new Date();
   var finalizeResult;
   try {
-    finalizeResult = finalizeReservationDetails_(details, now, applicantInfo);
+    finalizeResult = finalizeReservationDetails_(details, now, applicantInfo, reservationSheet, reservationIndex);
     if (!finalizeResult.ok) {
       return finalizeResult;
     }
@@ -466,10 +470,12 @@ function handleGetAvailability_(payload) {
   var payloadSlots = splitMulti_(payload.slot_candidates);
   var baseSlots = resolveSlotsForAgent_(agentName, payloadSlots);
   var reservationSheet = getOrCreateSheet_(RESERVATIONS_SHEET_NAME);
+  var reservationHeaders = ensureReservationHeaders_(reservationSheet);
+  var reservationIndex = buildReservationLookupIndex_(reservationSheet, reservationHeaders);
 
   var now = new Date();
   var startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  var reservations = loadReservationsForAgent_(agentName, startDate, days);
+  var reservations = loadReservationsForAgentFromIndex_(reservationIndex, agentName, startDate, days);
 
   var takenByDate = {};
   reservations.forEach(function(r) {
@@ -494,8 +500,8 @@ function handleGetAvailability_(payload) {
     var mDateStr = Utilities.formatDate(mDate, 'Asia/Tokyo', 'yyyy-MM-dd');
     monthKeys[mDateStr.slice(0, 7)] = true;
   }
-  var bookedByMonth = countBookedReservationsForAgentMonths_(
-    reservationSheet,
+  var bookedByMonth = countBookedReservationsForAgentMonthsFromIndex_(
+    reservationIndex,
     agentName,
     Object.keys(monthKeys)
   );
@@ -556,8 +562,10 @@ function handleReserveSlot_(payload) {
 
   try {
     var sheet = getOrCreateSheet_(RESERVATIONS_SHEET_NAME);
+    var reservationHeaders = ensureReservationHeaders_(sheet);
+    var reservationIndex = buildReservationLookupIndex_(sheet, reservationHeaders);
     var hash = buildReservationHash_(agentName, date, time);
-    var latest = getLatestReservationByHash_(sheet, hash);
+    var latest = getLatestReservationFromIndex_(reservationIndex, hash);
     var now = new Date();
     var latestRowNumber = latest ? latest._rowNumber : 0;
 
@@ -583,6 +591,7 @@ function handleReserveSlot_(payload) {
             updated_at_iso: now.toISOString(),
             updated_at_jst: formatJstMinute_(now)
           }, latestRowNumber);
+          upsertReservationIndex_(reservationIndex, latestRowNumber);
 
           return {
             ok: true,
@@ -612,6 +621,7 @@ function handleReserveSlot_(payload) {
       updated_at_iso: now.toISOString(),
       updated_at_jst: formatJstMinute_(now)
     }, latestRowNumber);
+    upsertReservationIndex_(reservationIndex, latestRowNumber || sheet.getLastRow());
 
     return {
       ok: true,
@@ -652,7 +662,9 @@ function handleUpdateReservationStatus_(payload) {
 
   try {
     var sheet = getOrCreateSheet_(RESERVATIONS_SHEET_NAME);
-    var latest = getLatestReservationByHash_(sheet, hash);
+    var reservationHeaders = ensureReservationHeaders_(sheet);
+    var reservationIndex = buildReservationLookupIndex_(sheet, reservationHeaders);
+    var latest = getLatestReservationFromIndex_(reservationIndex, hash);
     if (!latest) {
       return { ok: false, error: 'reservation not found' };
     }
@@ -660,7 +672,7 @@ function handleUpdateReservationStatus_(payload) {
     var now = new Date();
     if (status === RESERVATION_STATUS.BOOKED) {
       var monthKey = (latest.date || '').slice(0, 7);
-      var bookedByMonth = countBookedReservationsForAgentMonths_(sheet, latest.agent_name, [monthKey]);
+      var bookedByMonth = countBookedReservationsForAgentMonthsFromIndex_(reservationIndex, latest.agent_name, [monthKey]);
       if ((bookedByMonth[monthKey] || 0) >= MONTHLY_INTERVIEW_LIMIT_PER_AGENT) {
         return { ok: false, error: 'この会社の当月面談枠（14件）は上限に達しています。' };
       }
@@ -688,6 +700,7 @@ function handleUpdateReservationStatus_(payload) {
       calendar_event_id: String(latest.calendar_event_id || '').trim(),
       calendar_event_url: String(latest.calendar_event_url || '').trim()
     }, latest._rowNumber);
+    upsertReservationIndex_(reservationIndex, rowNumber);
 
     syncCalendarAndCompanyByReservationHash_(sheet, hash, rowNumber, status, now);
     return { ok: true, reservation_hash: hash, status: status };
@@ -696,8 +709,9 @@ function handleUpdateReservationStatus_(payload) {
   }
 }
 
-function finalizeReservationDetails_(details, now, applicantInfo) {
-  var sheet = getOrCreateSheet_(RESERVATIONS_SHEET_NAME);
+function finalizeReservationDetails_(details, now, applicantInfo, sheet, reservationIndex) {
+  var reservationSheet = sheet || getOrCreateSheet_(RESERVATIONS_SHEET_NAME);
+  var lookupIndex = reservationIndex || buildReservationLookupIndex_(reservationSheet);
   var results = [];
   var calendarSync = [];
   var monthlyBookedCache = {};
@@ -714,7 +728,7 @@ function finalizeReservationDetails_(details, now, applicantInfo) {
       return { ok: false, error: 'reservation_details has invalid entry' };
     }
 
-    var latest = getLatestReservationByHash_(sheet, hash);
+    var latest = getLatestReservationFromIndex_(lookupIndex, hash);
     if (!latest) {
       return { ok: false, error: '予約情報が見つかりません。再度日程を選択してください。' };
     }
@@ -744,7 +758,7 @@ function finalizeReservationDetails_(details, now, applicantInfo) {
     var monthKey = date.slice(0, 7);
     var cacheKey = agentName + '|' + monthKey;
     if (monthlyBookedCache[cacheKey] === undefined) {
-      var monthBooked = countBookedReservationsForAgentMonths_(sheet, agentName, [monthKey]);
+      var monthBooked = countBookedReservationsForAgentMonthsFromIndex_(lookupIndex, agentName, [monthKey]);
       monthlyBookedCache[cacheKey] = monthBooked[monthKey] || 0;
     }
     if (monthlyBookedCache[cacheKey] >= MONTHLY_INTERVIEW_LIMIT_PER_AGENT) {
@@ -754,7 +768,7 @@ function finalizeReservationDetails_(details, now, applicantInfo) {
       return { ok: false, error: '担当者の予定と重複しているため、この時間は予約できません。' };
     }
 
-    var rowNumber = appendReservationEvent_(sheet, {
+    var rowNumber = appendReservationEvent_(reservationSheet, {
       reservation_hash: hash,
       agent_name: latest.agent_name,
       date: toReservationSheetDate_(latest.date),
@@ -770,9 +784,10 @@ function finalizeReservationDetails_(details, now, applicantInfo) {
       applicant_tel: applicantInfo && applicantInfo.tel ? applicantInfo.tel : '',
       applicant_email: applicantInfo && applicantInfo.email ? applicantInfo.email : ''
     }, latest._rowNumber);
+    upsertReservationIndex_(lookupIndex, rowNumber);
     monthlyBookedCache[cacheKey] += 1;
 
-    var synced = syncCalendarAndCompanyByReservationHash_(sheet, hash, rowNumber, RESERVATION_STATUS.BOOKED, now);
+    var synced = syncCalendarAndCompanyByReservationHash_(reservationSheet, hash, rowNumber, RESERVATION_STATUS.BOOKED, now);
     calendarSync.push(synced);
 
     results.push({ reservation_hash: hash, status: RESERVATION_STATUS.BOOKED });
@@ -1388,6 +1403,179 @@ function getLatestReservationByHash_(sheet, hash) {
   }
 
   return latest;
+}
+
+function buildReservationLookupIndex_(sheet, headers) {
+  var targetHeaders = (headers && headers.length) ? headers.slice() : ensureReservationHeaders_(sheet);
+  var index = {
+    sheet: sheet,
+    headers: targetHeaders,
+    latestByHash: {},
+    latestByKey: {},
+    latestEntries: []
+  };
+
+  var lastRow = sheet.getLastRow();
+  var lastCol = sheet.getLastColumn();
+  if (lastRow <= 1 || lastCol <= 0) return index;
+
+  var values = sheet.getRange(1, 1, lastRow, lastCol).getValues();
+  var rowHeaders = values[0].map(function(v) { return String(v || '').trim(); });
+  index.headers = rowHeaders.length ? rowHeaders.slice() : index.headers;
+  index.idx = getReservationHeaderIndexes_(index.headers);
+
+  var byKey = {};
+  for (var i = 1; i < values.length; i += 1) {
+    var row = values[i];
+    var item = buildReservationRecordFromRow_(row, index.idx, i + 1);
+    if (!item) continue;
+
+    var recordKey = buildReservationKey_(item.agent_name, item.date, item.time);
+    if (!recordKey) recordKey = item.reservation_hash || ('row_' + (i + 1));
+    byKey[recordKey] = item;
+  }
+
+  var entries = [];
+  Object.keys(byKey).forEach(function(key) {
+    var item = byKey[key];
+    entries.push(item);
+    if (item.reservation_hash) index.latestByHash[item.reservation_hash] = item;
+    var normalizedKey = buildReservationKey_(item.agent_name, item.date, item.time);
+    if (normalizedKey) index.latestByKey[normalizedKey] = item;
+  });
+
+  index.latestEntries = entries;
+  return index;
+}
+
+function buildReservationRecordFromRow_(row, idx, rowNumber) {
+  if (!row || !idx) return null;
+  var agentName = idx.agent >= 0 ? String(row[idx.agent] || '').trim() : '';
+  var date = idx.date >= 0 ? normalizeReservationDate_(row[idx.date]) : '';
+  var time = idx.time >= 0 ? normalizeReservationTimeSlot_(row[idx.time]) : '';
+  if (!agentName || !date || !time) return null;
+
+  var rowHash = idx.hash >= 0 ? String(row[idx.hash] || '').trim() : '';
+  var effectiveHash = rowHash || buildReservationHash_(agentName, date, time);
+  if (!effectiveHash) return null;
+
+  return {
+    _rowNumber: rowNumber,
+    reservation_hash: effectiveHash,
+    agent_name: agentName,
+    date: date,
+    time: time,
+    status: idx.status >= 0 ? String(row[idx.status] || '').trim() : '',
+    hold_token: idx.holdToken >= 0 ? String(row[idx.holdToken] || '').trim() : '',
+    hold_expires_at_iso: idx.holdExpires >= 0 ? String(row[idx.holdExpires] || '').trim() : '',
+    booked_at_iso: idx.bookedIso >= 0 ? String(row[idx.bookedIso] || '').trim() : '',
+    booked_at_jst: idx.bookedJst >= 0 ? String(row[idx.bookedJst] || '').trim() : '',
+    updated_at_iso: idx.updatedIso >= 0 ? String(row[idx.updatedIso] || '').trim() : '',
+    updated_at_jst: idx.updatedJst >= 0 ? String(row[idx.updatedJst] || '').trim() : '',
+    applicant_name: idx.applicantName >= 0 ? String(row[idx.applicantName] || '').trim() : '',
+    applicant_tel: idx.applicantTel >= 0 ? String(row[idx.applicantTel] || '').trim() : '',
+    applicant_email: idx.applicantEmail >= 0 ? String(row[idx.applicantEmail] || '').trim() : '',
+    calendar_id: idx.calendarId >= 0 ? String(row[idx.calendarId] || '').trim() : '',
+    calendar_event_id: idx.calendarEventId >= 0 ? String(row[idx.calendarEventId] || '').trim() : '',
+    calendar_event_url: idx.calendarEventUrl >= 0 ? String(row[idx.calendarEventUrl] || '').trim() : ''
+  };
+}
+
+function buildReservationKey_(agentName, date, time) {
+  var a = String(agentName || '').trim();
+  var d = normalizeReservationDate_(date);
+  var t = normalizeReservationTimeSlot_(time);
+  if (!a || !d || !t) return '';
+  return [a, d, t].join('|');
+}
+
+function getLatestReservationFromIndex_(index, hash) {
+  var normalizedHash = String(hash || '').trim();
+  if (!index || !normalizedHash) return null;
+  if (index.latestByHash && index.latestByHash[normalizedHash]) {
+    return index.latestByHash[normalizedHash];
+  }
+
+  var parsedHash = parseReservationHash_(normalizedHash);
+  if (!parsedHash) return null;
+  var key = buildReservationKey_(parsedHash.agent_name, parsedHash.date, parsedHash.time);
+  if (!key) return null;
+  return (index.latestByKey && index.latestByKey[key]) || null;
+}
+
+function upsertReservationIndex_(index, rowNumber) {
+  if (!index || !index.sheet) return null;
+  var latest = getReservationByRowNumber_(index.sheet, rowNumber);
+  if (!latest) return null;
+
+  var key = buildReservationKey_(latest.agent_name, latest.date, latest.time) || latest.reservation_hash;
+  if (!key) return latest;
+
+  if (!index.latestByKey) index.latestByKey = {};
+  if (!index.latestByHash) index.latestByHash = {};
+  index.latestByKey[key] = latest;
+  if (latest.reservation_hash) index.latestByHash[latest.reservation_hash] = latest;
+
+  var replaced = false;
+  index.latestEntries = (index.latestEntries || []).map(function(entry) {
+    var entryKey = buildReservationKey_(entry.agent_name, entry.date, entry.time) || entry.reservation_hash;
+    if (entryKey === key) {
+      replaced = true;
+      return latest;
+    }
+    return entry;
+  });
+  if (!replaced) index.latestEntries.push(latest);
+  return latest;
+}
+
+function countBookedReservationsForAgentMonthsFromIndex_(index, agentName, monthKeys) {
+  var counts = {};
+  (monthKeys || []).forEach(function(m) { counts[m] = 0; });
+  if (!index || !agentName || !monthKeys || !monthKeys.length) return counts;
+
+  var targetMonths = {};
+  monthKeys.forEach(function(m) { targetMonths[m] = true; });
+
+  var entries = index.latestEntries || [];
+  for (var i = 0; i < entries.length; i += 1) {
+    var item = entries[i];
+    if (!item || item.agent_name !== agentName) continue;
+    var date = normalizeReservationDate_(item.date);
+    if (!date) continue;
+    var month = date.slice(0, 7);
+    if (!targetMonths[month]) continue;
+    if (normalizeReservationStatus_(item.status) === RESERVATION_STATUS.BOOKED) {
+      counts[month] = (counts[month] || 0) + 1;
+    }
+  }
+  return counts;
+}
+
+function loadReservationsForAgentFromIndex_(index, agentName, startDate, days) {
+  if (!index || !agentName || !startDate || !days) return [];
+  var startStr = Utilities.formatDate(startDate, 'Asia/Tokyo', 'yyyy-MM-dd');
+  var end = new Date(startDate);
+  end.setDate(startDate.getDate() + days - 1);
+  var endStr = Utilities.formatDate(end, 'Asia/Tokyo', 'yyyy-MM-dd');
+
+  var rows = [];
+  var entries = index.latestEntries || [];
+  for (var i = 0; i < entries.length; i += 1) {
+    var item = entries[i];
+    if (!item || item.agent_name !== agentName) continue;
+    var date = normalizeReservationDate_(item.date);
+    if (!date || date < startStr || date > endStr) continue;
+    rows.push({
+      reservation_hash: item.reservation_hash,
+      agent_name: item.agent_name,
+      date: date,
+      time: normalizeReservationTimeSlot_(item.time),
+      status: item.status,
+      hold_expires_at_iso: item.hold_expires_at_iso || ''
+    });
+  }
+  return rows;
 }
 
 function appendReservationEvent_(sheet, obj, rowNumber) {
