@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Jobflow Matching Scheduler
  * Description: 求職者の質問回答 -> 3社提案 -> 日程調整 -> 予約完了導線を1つのショートコードで提供します。
- * Version: 1.0.0
+ * Version: 1.1.0
  * Author: Cursor Agent
  */
 
@@ -16,6 +16,22 @@ final class Jobflow_Matching_Scheduler_Plugin
     private const SLOT_MINUTES = 60;
     private const SLOT_HOURS = [10, 11, 13, 14, 15, 16, 17, 18];
     private const OPTION_LINE_URL = "jobflow_line_registration_url";
+    private const OPTION_GOOGLE_SERVICE_ACCOUNT_JSON = "jobflow_google_service_account_json";
+    private const OPTION_GLOBAL_BOOKING_SHEET_ID = "jobflow_global_booking_sheet_id";
+    private const OPTION_COMPANY_INTEGRATIONS = "jobflow_company_integrations";
+    private const OPTION_RECAPTCHA_SITE_KEY = "jobflow_recaptcha_site_key";
+    private const OPTION_RECAPTCHA_SECRET_KEY = "jobflow_recaptcha_secret_key";
+    private const OPTION_ENABLE_GOOGLE_NATIVE = "jobflow_enable_google_native";
+    private const RATE_LIMIT_WINDOW_SECONDS = 600;
+    private const RATE_LIMIT_MAX_REQUESTS = 45;
+    private const COMPANY_IDS = [
+        "comp-axis",
+        "comp-tech",
+        "comp-sales",
+        "comp-marketing",
+        "comp-balance",
+        "comp-service",
+    ];
 
     /** @var Jobflow_Matching_Scheduler_Plugin|null */
     private static $instance = null;
@@ -63,6 +79,11 @@ final class Jobflow_Matching_Scheduler_Plugin
         add_shortcode("jobflow_app", [$this, "render_shortcode"]);
         add_action("rest_api_init", [$this, "register_rest_routes"]);
         add_action("admin_menu", [$this, "add_admin_menu"]);
+        add_action("admin_init", [$this, "register_settings"]);
+        add_filter("jobflow_google_busy_ranges", [$this, "default_google_busy_ranges"], 10, 4);
+        add_filter("jobflow_google_slot_is_free", [$this, "default_google_slot_is_free"], 10, 4);
+        add_filter("jobflow_google_create_event", [$this, "default_google_create_event"], 10, 2);
+        add_action("jobflow_append_to_sheet", [$this, "default_append_to_sheet"], 10, 1);
     }
 
     public function activate(): void
@@ -71,6 +92,12 @@ final class Jobflow_Matching_Scheduler_Plugin
         $this->seed_companies();
         if (get_option(self::OPTION_LINE_URL) === false) {
             add_option(self::OPTION_LINE_URL, "https://line.me/R/ti/p/@example");
+        }
+        if (get_option(self::OPTION_ENABLE_GOOGLE_NATIVE) === false) {
+            add_option(self::OPTION_ENABLE_GOOGLE_NATIVE, "0");
+        }
+        if (get_option(self::OPTION_COMPANY_INTEGRATIONS) === false) {
+            add_option(self::OPTION_COMPANY_INTEGRATIONS, []);
         }
     }
 
@@ -267,10 +294,43 @@ final class Jobflow_Matching_Scheduler_Plugin
                 $url = "https://line.me";
             }
             update_option(self::OPTION_LINE_URL, $url);
+            $enable_google_native = isset($_POST["enable_google_native"]) ? "1" : "0";
+            update_option(self::OPTION_ENABLE_GOOGLE_NATIVE, $enable_google_native);
+
+            $google_service_account_json = isset($_POST["google_service_account_json"])
+                ? trim((string) wp_unslash($_POST["google_service_account_json"]))
+                : "";
+            update_option(self::OPTION_GOOGLE_SERVICE_ACCOUNT_JSON, $google_service_account_json);
+
+            $global_booking_sheet_id = isset($_POST["global_booking_sheet_id"])
+                ? sanitize_text_field(wp_unslash($_POST["global_booking_sheet_id"]))
+                : "";
+            update_option(self::OPTION_GLOBAL_BOOKING_SHEET_ID, $global_booking_sheet_id);
+
+            $recaptcha_site_key = isset($_POST["recaptcha_site_key"])
+                ? sanitize_text_field(wp_unslash($_POST["recaptcha_site_key"]))
+                : "";
+            $recaptcha_secret_key = isset($_POST["recaptcha_secret_key"])
+                ? sanitize_text_field(wp_unslash($_POST["recaptcha_secret_key"]))
+                : "";
+            update_option(self::OPTION_RECAPTCHA_SITE_KEY, $recaptcha_site_key);
+            update_option(self::OPTION_RECAPTCHA_SECRET_KEY, $recaptcha_secret_key);
+
+            $company_integrations_raw = isset($_POST["company_integrations"]) && is_array($_POST["company_integrations"])
+                ? wp_unslash($_POST["company_integrations"])
+                : [];
+            update_option(self::OPTION_COMPANY_INTEGRATIONS, $this->sanitize_company_integrations($company_integrations_raw));
+
             echo '<div class="updated"><p>設定を保存しました。</p></div>';
         }
 
         $line_url = esc_url(get_option(self::OPTION_LINE_URL, "https://line.me/R/ti/p/@example"));
+        $enable_google_native = get_option(self::OPTION_ENABLE_GOOGLE_NATIVE, "0") === "1";
+        $google_service_account_json = (string) get_option(self::OPTION_GOOGLE_SERVICE_ACCOUNT_JSON, "");
+        $global_booking_sheet_id = (string) get_option(self::OPTION_GLOBAL_BOOKING_SHEET_ID, "");
+        $recaptcha_site_key = (string) get_option(self::OPTION_RECAPTCHA_SITE_KEY, "");
+        $recaptcha_secret_key = (string) get_option(self::OPTION_RECAPTCHA_SECRET_KEY, "");
+        $company_integrations = $this->get_company_integrations();
         ?>
         <div class="wrap">
             <h1>Jobflow 設定</h1>
@@ -283,12 +343,545 @@ final class Jobflow_Matching_Scheduler_Plugin
                             <th scope="row"><label for="line_registration_url">LINE登録URL</label></th>
                             <td><input name="line_registration_url" id="line_registration_url" class="regular-text" type="url" value="<?php echo esc_attr($line_url); ?>"></td>
                         </tr>
+                        <tr>
+                            <th scope="row"><label for="enable_google_native">Google連携を有効化</label></th>
+                            <td>
+                                <label>
+                                    <input name="enable_google_native" id="enable_google_native" type="checkbox" value="1" <?php checked($enable_google_native); ?>>
+                                    FreeBusy / 予定作成 / Sheets追記をプラグイン内で実行
+                                </label>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row"><label for="google_service_account_json">Google Service Account JSON</label></th>
+                            <td>
+                                <textarea name="google_service_account_json" id="google_service_account_json" class="large-text code" rows="10"><?php echo esc_textarea($google_service_account_json); ?></textarea>
+                                <p class="description">サービスアカウントJSONをそのまま貼り付け（秘密情報のため管理者のみ操作してください）</p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row"><label for="global_booking_sheet_id">全体予約一覧 Spreadsheet ID</label></th>
+                            <td><input name="global_booking_sheet_id" id="global_booking_sheet_id" class="regular-text" type="text" value="<?php echo esc_attr($global_booking_sheet_id); ?>"></td>
+                        </tr>
+                        <tr>
+                            <th scope="row"><label for="recaptcha_site_key">reCAPTCHA Site Key</label></th>
+                            <td><input name="recaptcha_site_key" id="recaptcha_site_key" class="regular-text" type="text" value="<?php echo esc_attr($recaptcha_site_key); ?>"></td>
+                        </tr>
+                        <tr>
+                            <th scope="row"><label for="recaptcha_secret_key">reCAPTCHA Secret Key</label></th>
+                            <td><input name="recaptcha_secret_key" id="recaptcha_secret_key" class="regular-text" type="text" value="<?php echo esc_attr($recaptcha_secret_key); ?>"></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h2>会社ごとのGoogle連携設定</h2>
+                <table class="widefat striped" style="max-width:1000px">
+                    <thead>
+                        <tr>
+                            <th>会社ID</th>
+                            <th>Google Calendar ID</th>
+                            <th>会社別 Spreadsheet ID</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach (self::COMPANY_IDS as $company_id) : ?>
+                            <tr>
+                                <td><code><?php echo esc_html($company_id); ?></code></td>
+                                <td>
+                                    <input
+                                        type="text"
+                                        class="regular-text"
+                                        name="company_integrations[<?php echo esc_attr($company_id); ?>][calendar_id]"
+                                        value="<?php echo esc_attr($company_integrations[$company_id]["calendar_id"]); ?>"
+                                    >
+                                </td>
+                                <td>
+                                    <input
+                                        type="text"
+                                        class="regular-text"
+                                        name="company_integrations[<?php echo esc_attr($company_id); ?>][sheet_id]"
+                                        value="<?php echo esc_attr($company_integrations[$company_id]["sheet_id"]); ?>"
+                                    >
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
                     </tbody>
                 </table>
                 <?php submit_button("保存"); ?>
             </form>
         </div>
         <?php
+    }
+
+    public function register_settings(): void
+    {
+        // Manual save in render_settings_page() を利用するため、ここではフック定義のみ維持。
+    }
+
+    /**
+     * @param array<int|string, mixed> $raw
+     * @return array<string, array<string, string>>
+     */
+    private function sanitize_company_integrations(array $raw): array
+    {
+        $sanitized = [];
+        foreach (self::COMPANY_IDS as $company_id) {
+            $row = isset($raw[$company_id]) && is_array($raw[$company_id]) ? $raw[$company_id] : [];
+            $sanitized[$company_id] = [
+                "calendar_id" => isset($row["calendar_id"]) ? sanitize_text_field((string) $row["calendar_id"]) : "",
+                "sheet_id" => isset($row["sheet_id"]) ? sanitize_text_field((string) $row["sheet_id"]) : "",
+            ];
+        }
+        return $sanitized;
+    }
+
+    /**
+     * @return array<string, array<string, string>>
+     */
+    private function get_company_integrations(): array
+    {
+        $stored = get_option(self::OPTION_COMPANY_INTEGRATIONS, []);
+        return $this->sanitize_company_integrations(is_array($stored) ? $stored : []);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function get_company_integration(string $company_id): array
+    {
+        $all = $this->get_company_integrations();
+        return $all[$company_id] ?? ["calendar_id" => "", "sheet_id" => ""];
+    }
+
+    private function is_google_native_enabled(): bool
+    {
+        return get_option(self::OPTION_ENABLE_GOOGLE_NATIVE, "0") === "1";
+    }
+
+    private function get_recaptcha_secret(): string
+    {
+        return trim((string) get_option(self::OPTION_RECAPTCHA_SECRET_KEY, ""));
+    }
+
+    private function get_client_ip(): string
+    {
+        $headers = [
+            "HTTP_CF_CONNECTING_IP",
+            "HTTP_X_FORWARDED_FOR",
+            "HTTP_X_REAL_IP",
+            "REMOTE_ADDR",
+        ];
+        foreach ($headers as $header) {
+            if (empty($_SERVER[$header])) {
+                continue;
+            }
+            $raw = (string) $_SERVER[$header];
+            $first = trim(explode(",", $raw)[0]);
+            if (filter_var($first, FILTER_VALIDATE_IP)) {
+                return $first;
+            }
+        }
+        return "0.0.0.0";
+    }
+
+    private function check_rate_limit(string $action, string $ip): bool
+    {
+        $key = "jobflow_rl_" . md5($action . "|" . $ip);
+        $current = get_transient($key);
+        if (!is_array($current) || !isset($current["count"], $current["started_at"])) {
+            set_transient(
+                $key,
+                ["count" => 1, "started_at" => time()],
+                self::RATE_LIMIT_WINDOW_SECONDS
+            );
+            return true;
+        }
+
+        $count = (int) $current["count"];
+        $started_at = (int) $current["started_at"];
+        if ((time() - $started_at) >= self::RATE_LIMIT_WINDOW_SECONDS) {
+            set_transient(
+                $key,
+                ["count" => 1, "started_at" => time()],
+                self::RATE_LIMIT_WINDOW_SECONDS
+            );
+            return true;
+        }
+
+        if ($count >= self::RATE_LIMIT_MAX_REQUESTS) {
+            return false;
+        }
+
+        $current["count"] = $count + 1;
+        set_transient($key, $current, self::RATE_LIMIT_WINDOW_SECONDS);
+        return true;
+    }
+
+    private function rest_validate_request(WP_REST_Request $request, string $action)
+    {
+        $ip = $this->get_client_ip();
+        if (!$this->check_rate_limit($action, $ip)) {
+            return new WP_Error("too_many_requests", "アクセスが集中しています。しばらくしてから再試行してください。", ["status" => 429]);
+        }
+
+        $secret = $this->get_recaptcha_secret();
+        if ($secret !== "" && in_array($action, ["recommendations", "bookings"], true)) {
+            $body = $request->get_json_params();
+            $token = "";
+            if (is_array($body) && isset($body["recaptchaToken"])) {
+                $token = sanitize_text_field((string) $body["recaptchaToken"]);
+            }
+            if ($token === "") {
+                return new WP_Error("recaptcha_required", "reCAPTCHA トークンが必要です。", ["status" => 400]);
+            }
+            if (!$this->verify_recaptcha_token($token, $ip)) {
+                return new WP_Error("recaptcha_failed", "reCAPTCHA 検証に失敗しました。", ["status" => 400]);
+            }
+        }
+        return true;
+    }
+
+    private function verify_recaptcha_token(string $token, string $ip): bool
+    {
+        $secret = $this->get_recaptcha_secret();
+        if ($secret === "") {
+            return true;
+        }
+        $response = wp_remote_post("https://www.google.com/recaptcha/api/siteverify", [
+            "timeout" => 10,
+            "body" => [
+                "secret" => $secret,
+                "response" => $token,
+                "remoteip" => $ip,
+            ],
+        ]);
+        if (is_wp_error($response)) {
+            return false;
+        }
+        $json = json_decode((string) wp_remote_retrieve_body($response), true);
+        if (!is_array($json) || empty($json["success"])) {
+            return false;
+        }
+        if (isset($json["score"]) && is_numeric($json["score"]) && (float) $json["score"] < 0.3) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * @return array<string, mixed>|WP_Error
+     */
+    private function google_api_request(string $url, string $method, array $payload = [], string $access_token = "")
+    {
+        $args = [
+            "method" => strtoupper($method),
+            "timeout" => 18,
+            "headers" => [
+                "Content-Type" => "application/json; charset=utf-8",
+            ],
+        ];
+        if ($access_token !== "") {
+            $args["headers"]["Authorization"] = "Bearer " . $access_token;
+        }
+        if ($args["method"] === "GET") {
+            if (!empty($payload)) {
+                $url = add_query_arg($payload, $url);
+            }
+        } else {
+            $args["body"] = wp_json_encode($payload, JSON_UNESCAPED_UNICODE);
+        }
+
+        $response = wp_remote_request($url, $args);
+        if (is_wp_error($response)) {
+            return $response;
+        }
+
+        $status = (int) wp_remote_retrieve_response_code($response);
+        $body = (string) wp_remote_retrieve_body($response);
+        $json = json_decode($body, true);
+        if ($status < 200 || $status >= 300) {
+            return new WP_Error("google_api_error", "Google API error", [
+                "status" => $status,
+                "body" => $json ?: $body,
+            ]);
+        }
+        return is_array($json) ? $json : [];
+    }
+
+    /**
+     * @return array<string, string>|null
+     */
+    private function get_google_service_account_credentials(): ?array
+    {
+        $json = trim((string) get_option(self::OPTION_GOOGLE_SERVICE_ACCOUNT_JSON, ""));
+        if ($json === "") {
+            return null;
+        }
+        $decoded = json_decode($json, true);
+        if (!is_array($decoded)) {
+            return null;
+        }
+        if (empty($decoded["client_email"]) || empty($decoded["private_key"])) {
+            return null;
+        }
+        return [
+            "client_email" => (string) $decoded["client_email"],
+            "private_key" => (string) $decoded["private_key"],
+            "token_uri" => isset($decoded["token_uri"]) ? (string) $decoded["token_uri"] : "https://oauth2.googleapis.com/token",
+        ];
+    }
+
+    private function base64url_encode(string $input): string
+    {
+        return rtrim(strtr(base64_encode($input), "+/", "-_"), "=");
+    }
+
+    private function build_google_jwt(string $client_email, string $private_key, string $token_uri): string
+    {
+        $now = time();
+        $header = ["alg" => "RS256", "typ" => "JWT"];
+        $payload = [
+            "iss" => $client_email,
+            "scope" => "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/spreadsheets",
+            "aud" => $token_uri,
+            "iat" => $now,
+            "exp" => $now + 3600,
+        ];
+        $encoded_header = $this->base64url_encode(wp_json_encode($header));
+        $encoded_payload = $this->base64url_encode(wp_json_encode($payload));
+        $to_sign = $encoded_header . "." . $encoded_payload;
+        $signature = "";
+        if (!function_exists("openssl_sign")) {
+            return "";
+        }
+        $ok = openssl_sign($to_sign, $signature, $private_key, OPENSSL_ALGO_SHA256);
+        if (!$ok) {
+            return "";
+        }
+        return $to_sign . "." . $this->base64url_encode($signature);
+    }
+
+    private function get_google_access_token(): string
+    {
+        if (!$this->is_google_native_enabled()) {
+            return "";
+        }
+        $creds = $this->get_google_service_account_credentials();
+        if ($creds === null) {
+            return "";
+        }
+        $cache_key = "jobflow_google_access_token_" . md5($creds["client_email"]);
+        $cached = get_transient($cache_key);
+        if (is_string($cached) && $cached !== "") {
+            return $cached;
+        }
+
+        $jwt = $this->build_google_jwt($creds["client_email"], $creds["private_key"], $creds["token_uri"]);
+        if ($jwt === "") {
+            return "";
+        }
+        $response = wp_remote_post($creds["token_uri"], [
+            "timeout" => 18,
+            "body" => [
+                "grant_type" => "urn:ietf:params:oauth:grant-type:jwt-bearer",
+                "assertion" => $jwt,
+            ],
+        ]);
+        if (is_wp_error($response)) {
+            return "";
+        }
+        $json = json_decode((string) wp_remote_retrieve_body($response), true);
+        if (!is_array($json) || empty($json["access_token"])) {
+            return "";
+        }
+        $token = (string) $json["access_token"];
+        $expires = isset($json["expires_in"]) ? max(120, ((int) $json["expires_in"]) - 120) : 3300;
+        set_transient($cache_key, $token, $expires);
+        return $token;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $ranges
+     * @param array<string, mixed> $company
+     * @return array<int, array<string, mixed>>
+     */
+    public function default_google_busy_ranges(array $ranges, array $company, DateTimeImmutable $start, DateTimeImmutable $end): array
+    {
+        if (!$this->is_google_native_enabled()) {
+            return $ranges;
+        }
+        $integration = $this->get_company_integration((string) ($company["id"] ?? ""));
+        $calendar_id = $integration["calendar_id"] ?? "";
+        if ($calendar_id === "") {
+            return $ranges;
+        }
+        $access_token = $this->get_google_access_token();
+        if ($access_token === "") {
+            return $ranges;
+        }
+
+        $result = $this->google_api_request(
+            "https://www.googleapis.com/calendar/v3/freeBusy",
+            "POST",
+            [
+                "timeMin" => $start->setTimezone(new DateTimeZone("UTC"))->format(DateTimeInterface::ATOM),
+                "timeMax" => $end->setTimezone(new DateTimeZone("UTC"))->format(DateTimeInterface::ATOM),
+                "timeZone" => wp_timezone_string(),
+                "items" => [["id" => $calendar_id]],
+            ],
+            $access_token
+        );
+        if (is_wp_error($result)) {
+            return $ranges;
+        }
+
+        $busy = $result["calendars"][$calendar_id]["busy"] ?? [];
+        if (!is_array($busy)) {
+            return $ranges;
+        }
+        $merged = $ranges;
+        foreach ($busy as $item) {
+            if (!is_array($item) || empty($item["start"]) || empty($item["end"])) {
+                continue;
+            }
+            $merged[] = [
+                "start" => (string) $item["start"],
+                "end" => (string) $item["end"],
+            ];
+        }
+        return $merged;
+    }
+
+    /**
+     * @param array<string, mixed> $company
+     */
+    public function default_google_slot_is_free(bool $is_free, array $company, DateTimeImmutable $start, DateTimeImmutable $end): bool
+    {
+        if (!$is_free) {
+            return false;
+        }
+        $ranges = $this->default_google_busy_ranges([], $company, $start, $end);
+        foreach ($ranges as $range) {
+            if (!is_array($range) || empty($range["start"]) || empty($range["end"])) {
+                continue;
+            }
+            $start_ts = strtotime((string) $range["start"]);
+            $end_ts = strtotime((string) $range["end"]);
+            if ($start_ts && $end_ts && $start_ts < $end->getTimestamp() && $end_ts > $start->getTimestamp()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * @param array<string, mixed> $booking
+     */
+    public function default_google_create_event(string $calendar_event_id, array $booking): string
+    {
+        if ($calendar_event_id !== "" || !$this->is_google_native_enabled()) {
+            return $calendar_event_id;
+        }
+        $company_id = (string) ($booking["company_id"] ?? "");
+        $integration = $this->get_company_integration($company_id);
+        $calendar_id = $integration["calendar_id"] ?? "";
+        if ($calendar_id === "") {
+            return "";
+        }
+        $access_token = $this->get_google_access_token();
+        if ($access_token === "") {
+            return "";
+        }
+
+        $answers = $this->json_decode_assoc((string) ($booking["answers_json"] ?? "{}"));
+        $answer_lines = [];
+        foreach ($answers as $k => $v) {
+            $answer_lines[] = "- " . $k . ": " . $v;
+        }
+
+        $result = $this->google_api_request(
+            "https://www.googleapis.com/calendar/v3/calendars/" . rawurlencode($calendar_id) . "/events",
+            "POST",
+            [
+                "summary" => "面談予約: " . (string) ($booking["seeker_name"] ?? "") . " 様",
+                "description" => implode("\n", [
+                    "求職者名: " . (string) ($booking["seeker_name"] ?? ""),
+                    "メール: " . (string) ($booking["seeker_email"] ?? ""),
+                    "電話: " . (string) ($booking["seeker_phone"] ?? ""),
+                    "",
+                    "回答内容:",
+                    implode("\n", $answer_lines),
+                ]),
+                "start" => [
+                    "dateTime" => $this->mysql_to_iso((string) $booking["start_at"]),
+                    "timeZone" => wp_timezone_string(),
+                ],
+                "end" => [
+                    "dateTime" => $this->mysql_to_iso((string) $booking["end_at"]),
+                    "timeZone" => wp_timezone_string(),
+                ],
+                "attendees" => array_values(array_filter([
+                    !empty($booking["rep_email"]) ? ["email" => (string) $booking["rep_email"]] : null,
+                    !empty($booking["seeker_email"]) ? ["email" => (string) $booking["seeker_email"]] : null,
+                ])),
+            ],
+            $access_token
+        );
+
+        if (is_wp_error($result)) {
+            return "";
+        }
+        return isset($result["id"]) ? (string) $result["id"] : "";
+    }
+
+    /**
+     * @param array<string, mixed> $booking
+     */
+    public function default_append_to_sheet(array $booking): void
+    {
+        if (!$this->is_google_native_enabled()) {
+            return;
+        }
+        $access_token = $this->get_google_access_token();
+        if ($access_token === "") {
+            return;
+        }
+
+        $global_sheet_id = trim((string) get_option(self::OPTION_GLOBAL_BOOKING_SHEET_ID, ""));
+        $company_id = (string) ($booking["company_id"] ?? "");
+        $company_sheet_id = $this->get_company_integration($company_id)["sheet_id"] ?? "";
+        $sheet_ids = array_values(array_unique(array_filter([$global_sheet_id, $company_sheet_id])));
+        if (empty($sheet_ids)) {
+            return;
+        }
+
+        $answers = $this->json_decode_assoc((string) ($booking["answers_json"] ?? "{}"));
+        $values = [[
+            $this->mysql_to_local_label((string) ($booking["created_at"] ?? "")),
+            (string) ($booking["id"] ?? ""),
+            (string) ($booking["company_name"] ?? ""),
+            (string) ($booking["seeker_name"] ?? ""),
+            (string) ($booking["seeker_email"] ?? ""),
+            (string) ($booking["seeker_phone"] ?? ""),
+            $this->mysql_to_local_label((string) ($booking["start_at"] ?? "")),
+            $this->mysql_to_local_label((string) ($booking["end_at"] ?? "")),
+            wp_json_encode($answers, JSON_UNESCAPED_UNICODE),
+        ]];
+
+        foreach ($sheet_ids as $sheet_id) {
+            $append_url = add_query_arg(
+                ["valueInputOption" => "USER_ENTERED"],
+                "https://sheets.googleapis.com/v4/spreadsheets/" . rawurlencode($sheet_id) . "/values/" . rawurlencode("A:I") . ":append"
+            );
+            $this->google_api_request(
+                $append_url,
+                "POST",
+                [
+                    "values" => $values,
+                ],
+                $access_token
+            );
+        }
     }
 
     public function register_rest_routes(): void
@@ -332,8 +925,13 @@ final class Jobflow_Matching_Scheduler_Plugin
         register_rest_route("jobflow/v1", "/bookings/company/(?P<company_id>[A-Za-z0-9_-]+)", [
             "methods" => "GET",
             "callback" => [$this, "rest_bookings_by_company"],
-            "permission_callback" => "__return_true",
+            "permission_callback" => [$this, "permission_company_bookings"],
         ]);
+    }
+
+    public function permission_company_bookings(): bool
+    {
+        return current_user_can("manage_options");
     }
 
     public function rest_questions(): WP_REST_Response
@@ -346,12 +944,17 @@ final class Jobflow_Matching_Scheduler_Plugin
         return new WP_REST_Response([
             "lineRegistrationUrl" => apply_filters("jobflow_line_registration_url", get_option(self::OPTION_LINE_URL, "https://line.me")),
             "monthlyLimit" => self::MONTHLY_LIMIT,
+            "recaptchaSiteKey" => (string) get_option(self::OPTION_RECAPTCHA_SITE_KEY, ""),
         ], 200);
     }
 
     public function rest_recommendations(WP_REST_Request $request)
     {
         global $wpdb;
+        $validated = $this->rest_validate_request($request, "recommendations");
+        if (is_wp_error($validated)) {
+            return $validated;
+        }
         $body = $request->get_json_params();
         $profile = isset($body["profile"]) && is_array($body["profile"]) ? $body["profile"] : [];
         $answers = isset($body["answers"]) && is_array($body["answers"]) ? $body["answers"] : [];
@@ -455,6 +1058,10 @@ final class Jobflow_Matching_Scheduler_Plugin
     public function rest_company_slots(WP_REST_Request $request)
     {
         global $wpdb;
+        $validated = $this->rest_validate_request($request, "slots");
+        if (is_wp_error($validated)) {
+            return $validated;
+        }
         $company_id = sanitize_text_field((string) $request->get_param("company_id"));
         $start_date = sanitize_text_field((string) ($request->get_param("startDate") ?: wp_date("Y-m-d", null, wp_timezone())));
         $days = (int) $request->get_param("days");
@@ -490,6 +1097,10 @@ final class Jobflow_Matching_Scheduler_Plugin
     public function rest_bookings(WP_REST_Request $request)
     {
         global $wpdb;
+        $validated = $this->rest_validate_request($request, "bookings");
+        if (is_wp_error($validated)) {
+            return $validated;
+        }
         $body = $request->get_json_params();
         $seeker_id = sanitize_text_field((string) ($body["seekerId"] ?? ""));
         $company_id = sanitize_text_field((string) ($body["companyId"] ?? ""));
@@ -1123,7 +1734,13 @@ final class Jobflow_Matching_Scheduler_Plugin
                 const restNonce = root.dataset.restNonce || "";
                 const isBookingMode = root.dataset.bookingMode === "1";
                 const bookingSeekerId = root.dataset.seekerId || "";
-                const state = { questions: [], answers: {}, seekerId: null, recommendations: [] };
+                const state = {
+                    questions: [],
+                    answers: {},
+                    seekerId: null,
+                    recommendations: [],
+                    recaptchaSiteKey: "",
+                };
 
                 const questionCard = document.getElementById("jobflowQuestionCard");
                 const resultCard = document.getElementById("jobflowResultCard");
@@ -1153,8 +1770,12 @@ final class Jobflow_Matching_Scheduler_Plugin
                 form.addEventListener("submit", onSubmit);
 
                 async function initialize() {
-                    const data = await apiGet("/questions");
-                    state.questions = data.questions || [];
+                    const [questionData, configData] = await Promise.all([apiGet("/questions"), apiGet("/public-config")]);
+                    state.questions = questionData.questions || [];
+                    state.recaptchaSiteKey = (configData && configData.recaptchaSiteKey) ? String(configData.recaptchaSiteKey) : "";
+                    if (state.recaptchaSiteKey) {
+                        await ensureRecaptchaLoaded(state.recaptchaSiteKey);
+                    }
                     renderQuestionFields();
                 }
 
@@ -1204,7 +1825,12 @@ final class Jobflow_Matching_Scheduler_Plugin
                     recommendBtn.disabled = true;
                     recommendBtn.textContent = "提案を作成中...";
                     try {
-                        const data = await apiPost("/recommendations", { profile, answers: state.answers });
+                        const recaptchaToken = await getRecaptchaToken("recommendations_submit");
+                        const data = await apiPost("/recommendations", {
+                            profile,
+                            answers: state.answers,
+                            recaptchaToken,
+                        });
                         state.seekerId = data.seekerId;
                         state.recommendations = data.recommendations || [];
                         renderRecommendations();
@@ -1288,11 +1914,13 @@ final class Jobflow_Matching_Scheduler_Plugin
                     hideAlert(bookingAlert);
                     statusEl.textContent = "予約処理中...";
                     try {
+                        const recaptchaToken = await getRecaptchaToken("bookings_submit");
                         const data = await apiPost("/bookings", {
                             seekerId: state.seekerId,
                             companyId,
                             slotStart,
-                            returnTo: window.location.pathname
+                            returnTo: window.location.pathname,
+                            recaptchaToken,
                         });
                         statusEl.textContent = `予約完了: ${formatDateTime(data.startAt)}`;
                         window.location.href = data.redirectTo;
@@ -1341,6 +1969,37 @@ final class Jobflow_Matching_Scheduler_Plugin
                     const data = await response.json();
                     if (!response.ok) throw new Error(data.message || data.error || "APIエラー");
                     return data;
+                }
+
+                async function ensureRecaptchaLoaded(siteKey) {
+                    if (!siteKey) return;
+                    if (window.grecaptcha && typeof window.grecaptcha.execute === "function") return;
+                    await new Promise((resolve, reject) => {
+                        const existing = document.querySelector(`script[data-jobflow-recaptcha="${siteKey}"]`);
+                        if (existing) {
+                            existing.addEventListener("load", () => resolve());
+                            existing.addEventListener("error", () => reject(new Error("reCAPTCHAスクリプトの読み込みに失敗しました。")));
+                            return;
+                        }
+                        const script = document.createElement("script");
+                        script.src = `https://www.google.com/recaptcha/api.js?render=${encodeURIComponent(siteKey)}`;
+                        script.async = true;
+                        script.defer = true;
+                        script.dataset.jobflowRecaptcha = siteKey;
+                        script.addEventListener("load", () => resolve());
+                        script.addEventListener("error", () => reject(new Error("reCAPTCHAスクリプトの読み込みに失敗しました。")));
+                        document.head.appendChild(script);
+                    });
+                }
+
+                async function getRecaptchaToken(action) {
+                    if (!state.recaptchaSiteKey) return "";
+                    await ensureRecaptchaLoaded(state.recaptchaSiteKey);
+                    if (!window.grecaptcha || typeof window.grecaptcha.execute !== "function") {
+                        throw new Error("reCAPTCHA が利用できません。");
+                    }
+                    await new Promise((resolve) => window.grecaptcha.ready(resolve));
+                    return window.grecaptcha.execute(state.recaptchaSiteKey, { action });
                 }
 
                 function showAlert(target, message) {

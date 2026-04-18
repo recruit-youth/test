@@ -85,9 +85,27 @@ npm run dev
 3. 固定ページ本文にショートコード `[jobflow_app]` を貼り付け
 4. 「Jobflow設定」メニューで LINE 登録URL を設定
 
-### WordPress版の連携拡張
+### 本番向け必須設定（WordPress版）
 
-Google Calendar / Google Sheets 連携は、プラグイン内のフックで拡張可能です。
+#### 1) セキュリティ
+- `reCAPTCHA Site Key` / `reCAPTCHA Secret Key` を設定（v3想定）
+  - 未設定時は reCAPTCHA チェックをスキップ
+- 会社予約一覧 API (`/jobflow/v1/bookings/company/:companyId`) は管理者権限のみアクセス可
+- API は IP 単位でレート制限を実施（10分あたり45リクエスト）
+
+#### 2) Google連携（カレンダー/スプレッドシート）
+- 「Google連携を有効化」を ON
+- `Google Service Account JSON` を設定
+- 会社ごとに以下を設定
+  - `Google Calendar ID`
+  - `会社別 Spreadsheet ID`
+- 必要に応じて `全体予約一覧 Spreadsheet ID` を設定
+
+#### 3) Google 側の権限
+- サービスアカウントに各社カレンダーへの編集権限を付与
+- 各スプレッドシートにサービスアカウントの編集権限を付与
+
+### WordPress版の拡張フック
 
 - `jobflow_google_busy_ranges`
 - `jobflow_google_slot_is_free`
